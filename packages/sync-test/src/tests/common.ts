@@ -1,11 +1,11 @@
 export const CKB_CONFIG = {
+  genesisHash: '0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717',
   ckbConfigPath: 'source/ckb',
   ckbLightClientConfigPath: 'source/ckb-light-client',
   binPath: 'source/bin',
 }
 
 export const CKB_CHAIN_DATA = {
-  dbBlock2000: 'source/ckb-data/db.2000.tar.gz',
   accounts: [
     'brush scan basic know movie next time soccer speak loop balcony describe',
     'equip slim poem depth struggle tonight define stool brave sustain spy cabbage',
@@ -14,9 +14,6 @@ export const CKB_CHAIN_DATA = {
 
 export const NEURON_CONFIG_DATA = {
   binPath: 'neuron',
-  envPath: {
-    dbBlock2000: 'source/neuron/.env',
-  },
   networks: {
     dev: 'source/neuron/dev-wallet1/dev/networks/index.dev.json',
     light: 'source/neuron/dev-wallet1/dev/networks/index.light.json',
@@ -32,27 +29,27 @@ export const NEURON_CONFIG_DATA = {
   },
 }
 
-// SQLite数据路径
-export const SQLITE_DATA_PATH = {
-  dbBlock2000: {
-    version: '',
-    fullNode:
-      'source/neuron-cell-data/2000/fullNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
-    lightNode:
-      'source/neuron-cell-data/2000/lightNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
-  },
-}
 export const fixtures = [
   {
-    name: 'Sync account1 with 10000 blocks',
-    neuronVersion: '',
-    genesisHash: '0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717',
-    ckbConfig: CKB_CONFIG,
-    neuronConfig: NEURON_CONFIG_DATA,
+    name: 'Sync account1 with 2000 blocks',
     syncAccount: NEURON_CONFIG_DATA.accounts.account1,
-    ckbDataDb: CKB_CHAIN_DATA.dbBlock2000,
-    compareFullNodeSqlitePath: SQLITE_DATA_PATH.dbBlock2000.fullNode,
-    compareLightNodeSqlitePath: SQLITE_DATA_PATH.dbBlock2000.lightNode,
-    tmpPath: 'tmp',
+    ckbDataDb: 'source/data/2000/db.2000.tar.gz',
+    neuronEnv: 'source/data/2000/.env',
+    compareFullNodeSqlitePath:
+      'source/data/2000/account1/fullNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
+    compareLightNodeSqlitePath:
+      'source/data/2000/account1/lightNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
+    tmpPath: 'tmp/2000',
   },
+  // {
+  //   name: 'Sync account1 with 2800 blocks contains xudt data',
+  //   syncAccount: NEURON_CONFIG_DATA.accounts.account1,
+  //   ckbDataDb: 'source/data/xudt.2800/db.2800.xudt.tar.gz',
+  //   neuronEnv: 'source/data/xudt.2800/.env',
+  //   compareFullNodeSqlitePath:
+  //     'source/data/xudt.2800/account1/fullNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
+  //   compareLightNodeSqlitePath:
+  //     'source/data/xudt.2800/account1/lightNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
+  //   tmpPath: 'tmp/2800',
+  // },
 ]
