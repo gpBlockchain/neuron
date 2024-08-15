@@ -25,6 +25,7 @@ export const NEURON_CONFIG_DATA = {
       passwd: 'neuron.123456',
       account: 'aced9a1c-85c8-40eb-811d-9399212a92b9.json',
       walletsSelectId: 'c114f8e1-141f-49b1-937f-db0ab50faee5',
+      mm: 'brush scan basic know movie next time soccer speak loop balcony describe',
     },
   },
 }
@@ -41,15 +42,15 @@ export const fixtures = [
       'source/data/2000/account1/lightNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
     tmpPath: 'tmp/2000',
   },
-  // {
-  //   name: 'Sync account1 with 2800 blocks contains xudt data',
-  //   syncAccount: NEURON_CONFIG_DATA.accounts.account1,
-  //   ckbDataDb: 'source/data/xudt.2800/db.2800.xudt.tar.gz',
-  //   neuronEnv: 'source/data/xudt.2800/.env',
-  //   compareFullNodeSqlitePath:
-  //     'source/data/xudt.2800/account1/fullNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
-  //   compareLightNodeSqlitePath:
-  //     'source/data/xudt.2800/account1/lightNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
-  //   tmpPath: 'tmp/2800',
-  // },
+  {
+    name: 'Sync account1 with 3000 blocks contains xudt data',
+    syncAccount: NEURON_CONFIG_DATA.accounts.account1,
+    ckbDataDb: 'source/data/xudt.3000/db.3000.xudt.tar.gz',
+    neuronEnv: 'source/data/xudt.3000/.env',
+    compareFullNodeSqlitePath:
+      'source/data/xudt.3000/account1/fullNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
+    compareLightNodeSqlitePath:
+      'source/data/xudt.3000/account1/lightNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
+    tmpPath: 'tmp/2800',
+  },
 ]

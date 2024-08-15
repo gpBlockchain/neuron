@@ -7,8 +7,8 @@ import { compareNeuronDatabase } from '../services/neuron-sql-server'
 
 import { CKB_CONFIG, fixtures, NEURON_CONFIG_DATA } from './common'
 
-describe('sync test', function () {
-  fixtures.forEach((fixture, idx) => {
+fixtures.forEach((fixture, idx) => {
+  describe('sync test', function () {
     beforeEach(async () => {
       console.log('before each')
       await startCkbNodeWithData({
