@@ -7,7 +7,7 @@ const transaction_options: ComparisonOptions = {
 }
 const asset_account_options: ComparisonOptions = {
   fileName: 'asset_account_result.md',
-  excludedFields: ['id'],
+  excludedFields: ['id', 'udtType'],
   tableToCompare: 'asset_account',
 }
 const hd_public_key_info_options: ComparisonOptions = {
@@ -28,7 +28,7 @@ const output_options: ComparisonOptions = {
 
 const sudt_token_info_options: ComparisonOptions = {
   fileName: 'sudt_token_info_result.md',
-  excludedFields: ['id'],
+  excludedFields: ['id', 'udtType'],
   tableToCompare: 'sudt_token_info',
 }
 const tx_lock_options: ComparisonOptions = {
