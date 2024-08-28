@@ -687,6 +687,7 @@
         "308": "Amount is not enough",
         "309": "The receiver needs to upgrade her account address to accept more transfer.",
         "310": "Please enter a {{tagName}} address",
+        "311": "Please enter address",
         "402": "CKB App does not open. Please open the CKB App on your device.",
         "403": "No device detected. Please connect your device",
         "404": "Multiple device detected. Only one device of the same model can be connected.",
@@ -783,7 +784,8 @@
           "compensation-cycle-will-end": "Compensation cycle ends in approximately {{days}} days",
           "compensation-cycle-will-end-hours": "Compensation cycle ends in approximately {{hours}} hours",
           "compensation-cycle-has-ended": "Cycle has ended, CKB is ready to be unlocked",
-          "unlocking": "Unlocking..."
+          "unlocking": "Unlocking...",
+          "calculating-the-compensation-cycle": "Calculating the compensation cycle"
         }
       }
     },
@@ -1237,7 +1239,7 @@
       },
       "import-exist-xpubkey-dialog": {
         "replace-tip": "The watch-wallet has been imported before, would you replace it?",
-        "delete-tip": "The same original wallet existed. If you want to continue with the import, please delete it.."
+        "delete-tip": "The same original wallet existed. If you want to continue with the import, please delete it."
       }
     },
     "cell-manage": {

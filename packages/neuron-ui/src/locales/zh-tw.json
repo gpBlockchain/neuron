@@ -681,6 +681,7 @@
         "308": "餘額不足",
         "309": "收款人需要升級資產賬戶才能繼續接收轉賬。",
         "310": "請輸入 {{tagName}} 地址",
+        "311": "請輸入地址",
         "402": "CKB 應用未打開。請在妳的設備打開 CKB 應用。",
         "403": "未檢測到設備，請檢查妳的設備連接",
         "404": "檢測到多個設備，同一型號的設備只能同時連接一個。",
@@ -777,7 +778,8 @@
           "compensation-cycle-will-end": "補償週期約在 {{days}} 天后結束",
           "compensation-cycle-will-end-hours": "補償週期約在 {{hours}} 小時后結束",
           "compensation-cycle-has-ended": "補償週期已結束, 可以解鎖 CKB",
-          "unlocking": "解鎖中..."
+          "unlocking": "解鎖中...",
+          "calculating-the-compensation-cycle": "正在計算補償週期"
         }
       }
     },
