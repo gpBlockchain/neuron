@@ -4,7 +4,7 @@ import { ChildProcess, StdioNull, StdioPipe, spawn } from 'child_process'
 import { mkdirSync, cpSync } from 'node:fs'
 import { extractTarGz, platform, retry, rm } from '../utils/utils'
 import path from 'path'
-import {scheduler} from "timers/promises";
+import { scheduler } from 'timers/promises'
 
 export const CKB_HOST = `127.0.0.1`
 export const CKB_RPC_PORT = 8114

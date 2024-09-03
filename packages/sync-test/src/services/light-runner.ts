@@ -2,7 +2,7 @@ import { ChildProcess, spawn } from 'child_process'
 import { platform, rm } from '../utils/utils'
 import { cpSync, mkdirSync } from 'node:fs'
 import * as fs from 'fs'
-import {scheduler} from "timers/promises";
+import { scheduler } from 'timers/promises'
 
 let ckbLight: ChildProcess | null = null
 let ckbLightLog: fs.WriteStream | null = null
