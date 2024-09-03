@@ -1,7 +1,6 @@
 import { cleanCkbNode, startCkbMiner, startCkbNodeWithData, stopCkbNode } from '../services/ckb-runner'
 import { cleanLightCkbNode, startCkbLightNodeWithConfig, stopLightCkbNode } from '../services/light-runner'
 import { backupNeuronCells, startNeuronWithConfig, stopNeuron, waitNeuronSyncSuccess } from '../services/neuron-runner'
-import { scheduler } from 'timers/promises'
 
 import { compareNeuronDatabase } from '../services/neuron-sql-server'
 
@@ -79,11 +78,9 @@ fixtures.forEach((fixture, idx) => {
     afterEach(async () => {
       await stopCkbNode()
       await stopLightCkbNode()
-      await scheduler.wait(3 * 1000)
       await cleanCkbNode(`${fixture.tmpPath}/ckb`)
       await cleanLightCkbNode(`${fixture.tmpPath}/ckb-light-client`)
       await stopNeuron()
-      await scheduler.wait(3 * 1000)
     })
   })
 })
