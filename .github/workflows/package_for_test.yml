@@ -1,6 +1,6 @@
 name: Package Neuron for Test
 
-on: 
+on:
   issue_comment:
     types: [created]
   push:
@@ -14,9 +14,7 @@ jobs:
         node:
           - 20.15.1
         os:
-          - macos-latest
-          - ubuntu-20.04
-          - windows-2019
+          - windows-2022
 
     runs-on: ${{ matrix.os }}
 
@@ -92,19 +90,19 @@ jobs:
           key: 2022-12-21-${{ runner.os }}-${{ hashFiles('**/yarn.lock')}}
 
       - name: Add msbuild to PATH
-        if: matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-2022'
         uses: microsoft/setup-msbuild@v2
         env:
           ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
 
       - name: Setup Certificate
-        if: matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-2022'
         run: |
           echo "${{ secrets.SM_CLIENT_CERT_FILE_BASE64 }}" | base64 --decode > /d/Certificate_pkcs12.p12
         shell: bash
 
       - name: Set variables
-        if: matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-2022'
         run: |
           echo "SM_KEYPAIR_NAME=${{ secrets.SM_KEYPAIR_ALIAS }}" >> "$GITHUB_ENV"
           echo "SM_HOST=${{ secrets.SM_HOST }}" >> "$GITHUB_ENV"
@@ -117,7 +115,7 @@ jobs:
         shell: bash
 
       - name: Setting up the client tools
-        if: ${{ matrix.os == 'windows-2019' && env.SM_API_KEY != '' }}
+        if: ${{ matrix.os == 'windows-2022' && env.SM_API_KEY != '' }}
         run: |
           curl -X GET  https://one.digicert.com/signingmanager/api-ui/v1/releases/smtools-windows-x64.msi/download -H "x-api-key:%SM_API_KEY%" -o smtools-windows-x64.msi
           msiexec /i smtools-windows-x64.msi /quiet /qn
@@ -125,7 +123,7 @@ jobs:
         shell: cmd
 
       - name: Certificates Sync
-        if: ${{ matrix.os == 'windows-2019' && env.SM_API_KEY != '' }}
+        if: ${{ matrix.os == 'windows-2022' && env.SM_API_KEY != '' }}
         run: |
           smctl windows certsync
         shell: cmd
@@ -179,7 +177,7 @@ jobs:
           USE_HARD_LINKS: false
 
       - name: Package for Windows
-        if: matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-2022'
         run: |
           bash ./scripts/download-ckb.sh win
           yarn build
@@ -226,7 +224,7 @@ jobs:
           path: release/Neuron-*-arm64.dmg
 
       - name: Upload Neuron Win
-        if: matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-2022'
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Win
@@ -278,3 +276,80 @@ jobs:
           comment-id: ${{ github.event.comment.id }}
           body: Packageing failed in [${{ github.run_id }}](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}). @${{ github.event.comment.user.login }}
           edit-mode: append
+
+  sync-test:
+    if: ${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package -test')) || github.event_name == 'push' }}
+    needs: [packaging]
+    strategy:
+      matrix:
+        node:
+          - 18.12.0
+        os:
+          - windows-2022
+
+    runs-on: ${{ matrix.os }}
+
+    name: ${{ matrix.os }}(Node.js ${{ matrix.node }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+
+      - name: Install libudev
+        if: matrix.os == 'ubuntu-20.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev
+      - name: Download Neuron App Zip(x64)
+        if: matrix.os == 'macos-latest'
+        uses: actions/download-artifact@v4
+        with:
+          name: Neuron-Mac-x64
+          path: packages/sync-test
+
+      - name: Download Neuron Win
+        if: matrix.os == 'windows-2022'
+        uses: actions/download-artifact@v4
+        with:
+          name: Neuron-Win
+          path: packages/sync-test
+
+      - name: Download Neuron Linux
+        if: matrix.os == 'ubuntu-20.04'
+        uses: actions/download-artifact@v4
+        with:
+          name: Neuron-Linux
+          path: packages/sync-test
+
+      - name: macos run
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd packages/sync-test
+          yarn
+          bash scripts/prepare_neuron_macos.sh
+          yarn sync-test
+      - name:  Windows run
+        if: matrix.os == 'windows-2022'
+        run: |
+          cd packages\sync-test
+          yarn
+          .\scripts\prepare_neuron_windows.bat
+          yarn sync-test
+      - name: ubuntu run
+        if: matrix.os == 'ubuntu-20.04'
+        run: |
+          cd  packages/sync-test
+          yarn
+          bash scripts/prepare_neuron_linux.sh
+          xvfb-run --auto-servernum yarn sync-test
+      - name: tar result
+        if: always()
+        run: |
+          tar -zcvf tmp.${{ matrix.os  }}.tar.gz packages/sync-test/tmp
+      - name: Publish reports
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: jfoa-build-reports-${{ runner.os }}
+          path: tmp.${{ matrix.os  }}.tar.gz
