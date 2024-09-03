@@ -83,6 +83,7 @@ fixtures.forEach((fixture, idx) => {
       await cleanCkbNode(`${fixture.tmpPath}/ckb`)
       await cleanLightCkbNode(`${fixture.tmpPath}/ckb-light-client`)
       await stopNeuron()
+      await scheduler.wait(3 * 1000)
     })
   })
 })

@@ -2,6 +2,7 @@ import { ChildProcess, spawn } from 'child_process'
 import { platform, rm } from '../utils/utils'
 import { cpSync, mkdirSync } from 'node:fs'
 import * as fs from 'fs'
+import {scheduler} from "timers/promises";
 
 let ckbLight: ChildProcess | null = null
 let ckbLightLog: fs.WriteStream | null = null
@@ -72,4 +73,5 @@ export const stopLightCkbNode = async () => {
 export const cleanLightCkbNode = async (path: string) => {
   console.log('clean ckb light node env:', path)
   rm(path)
+  await scheduler.wait(3 * 1000)
 }
