@@ -261,7 +261,7 @@ jobs:
           path: packages/sync-test
 
       - name: Download Neuron Win
-        if: matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-2022'
         uses: actions/download-artifact@v4
         with:
           name: Neuron-Win
