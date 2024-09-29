@@ -48,7 +48,6 @@ modules = [
 	'Subscription',
 	'Experiment',
 	'Debug',
-	'Indexer',
 ]
 reject_ill_transactions = true
 enable_deprecated_rpc = false

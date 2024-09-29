@@ -56,7 +56,7 @@ export const fixtures = [
     richIndexer: false,
   },
   {
-    name: 'Sync account1 with 2000 blocks',
+    name: 'Sync account1 with 2000 blocks use rich indexer',
     syncAccount: NEURON_CONFIG_DATA.accounts.account1,
     ckbDataDb: 'source/data/2000/db.2000.tar.gz',
     neuronEnv: 'source/data/2000/.env',
@@ -68,7 +68,7 @@ export const fixtures = [
     richIndexer: true,
   },
   {
-    name: 'Sync account1 with 3000 blocks contains xudt data',
+    name: 'Sync account1 with 3000 blocks contains xudt data use rich indexer',
     syncAccount: NEURON_CONFIG_DATA.accounts.account1,
     ckbDataDb: 'source/data/xudt.3000/db.3000.xudt.tar.gz',
     neuronEnv: 'source/data/xudt.3000/.env',
