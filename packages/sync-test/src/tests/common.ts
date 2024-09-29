@@ -41,6 +41,7 @@ export const fixtures = [
     compareLightNodeSqlitePath:
       'source/data/2000/account1/lightNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
     tmpPath: 'tmp/2000',
+    richIndexer: false,
   },
   {
     name: 'Sync account1 with 3000 blocks contains xudt data',
@@ -52,5 +53,30 @@ export const fixtures = [
     compareLightNodeSqlitePath:
       'source/data/xudt.3000/account1/lightNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
     tmpPath: 'tmp/2800',
+    richIndexer: false,
+  },
+  {
+    name: 'Sync account1 with 2000 blocks',
+    syncAccount: NEURON_CONFIG_DATA.accounts.account1,
+    ckbDataDb: 'source/data/2000/db.2000.tar.gz',
+    neuronEnv: 'source/data/2000/.env',
+    compareFullNodeSqlitePath:
+      'source/data/2000/account1/fullNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
+    compareLightNodeSqlitePath:
+      'source/data/2000/account1/lightNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
+    tmpPath: 'tmp/2000-rich',
+    richIndexer: true,
+  },
+  {
+    name: 'Sync account1 with 3000 blocks contains xudt data',
+    syncAccount: NEURON_CONFIG_DATA.accounts.account1,
+    ckbDataDb: 'source/data/xudt.3000/db.3000.xudt.tar.gz',
+    neuronEnv: 'source/data/xudt.3000/.env',
+    compareFullNodeSqlitePath:
+      'source/data/xudt.3000/account1/fullNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
+    compareLightNodeSqlitePath:
+      'source/data/xudt.3000/account1/lightNode/wallet1/cell-0x9c96d0b369b5fd42d7e6b30d6dfdb46e32dac7293bf84de9d1e2d11ca7930717.sqlite',
+    tmpPath: 'tmp/2800-rich',
+    richIndexer: true,
   },
 ]
