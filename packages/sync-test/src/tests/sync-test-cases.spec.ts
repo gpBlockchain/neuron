@@ -16,6 +16,7 @@ fixtures.forEach((fixture, idx) => {
         dataPath: fixture.ckbDataDb,
         configPath: CKB_CONFIG.ckbConfigPath,
         decPath: `${fixture.tmpPath}/ckb`,
+        richIndexer: fixture.richIndexer,
       })
       await startCkbMiner({
         binPath: CKB_CONFIG.binPath,

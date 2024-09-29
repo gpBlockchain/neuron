@@ -31,6 +31,7 @@ export const startCkbNodeWithData = async (option: {
   configPath: string
   dataPath: string
   decPath: string
+  richIndexer: boolean
 }) => {
   if (ckb !== null) {
     console.info(`CKB:\tckb is not closed, close it before start...`)
@@ -42,7 +43,12 @@ export const startCkbNodeWithData = async (option: {
   cpSync(option.configPath, option.decPath, { recursive: true })
   await extractTarGz(option.dataPath, path.join(option.decPath, ...['data']))
   console.log('run start ckb cmd')
-  const options = ['run', '-C', option.decPath, '--indexer']
+  const options = ['run', '-C', option.decPath]
+  if (option.richIndexer) {
+    options.push('--rich-indexer')
+  } else {
+    options.push('--indexer')
+  }
   const stdio: (StdioNull | StdioPipe)[] = ['ignore', 'ignore', 'pipe']
   ckb = spawn(ckbBinary(option.binPath), options, { stdio })
   let ckbRpc = new RPC(CKB_RPC_URL)
