@@ -15,7 +15,8 @@
     "url": "https://github.com/nervosnetwork/neuron"
   },
   "scripts": {
-    "sync-test": "jest sync-test-cases.spec.ts"
+    "sync-test": "jest sync-test-cases.spec.ts",
+    "sync-wasm-test": "jest sync-test-cases-wasm.spec.ts"
   },
   "dependencies": {
     "@types/tar": "6.1.10"
