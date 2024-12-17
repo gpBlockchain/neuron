@@ -357,3 +357,56 @@ jobs:
         with:
           name: jfoa-build-reports-${{ runner.os }}
           path: tmp.${{ matrix.os  }}.tar.gz
+
+  sync-wasm-test:
+    if: ${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package -test')) || github.event_name == 'push' }}
+    needs: [packaging]
+    strategy:
+      matrix:
+        node:
+          - 18.12.0
+        os:
+          - ubuntu-20.04
+
+    runs-on: ${{ matrix.os }}
+
+    name: ${{ matrix.os }}(Node.js ${{ matrix.node }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+
+      - name: Install libudev
+        if: matrix.os == 'ubuntu-20.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev
+      - name: Download Neuron App Zip(x64)
+        if: matrix.os == 'macos-latest'
+        uses: actions/download-artifact@v4
+        with:
+          name: Neuron-Mac-x64
+          path: packages/sync-test
+
+      - name: ubuntu run
+        if: matrix.os == 'ubuntu-20.04'
+        run: |
+          git clone --recurse-submodules https://github.com/gpBlockchain/ckb-light-wasm-demo.git
+          cd ckb-light-wasm-demo
+          bash build.sh
+          cd ../
+          cd  packages/sync-test
+          yarn
+          bash scripts/prepare_neuron_linux.sh
+          xvfb-run --auto-servernum yarn sync-wasm-test
+      - name: tar result
+        if: always()
+        run: |
+          tar -zcvf tmp.${{ matrix.os  }}.tar.gz packages/sync-test/tmp
+      - name: Publish reports
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: jfoa-build-reports-wasm-${{ runner.os }}
+          path: tmp.${{ matrix.os  }}.tar.gz
