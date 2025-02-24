@@ -245,7 +245,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
 
       - name: Install libudev
@@ -301,7 +301,7 @@ jobs:
           tar -zcvf tmp.${{ matrix.os  }}.tar.gz packages/sync-test/tmp
       - name: Publish reports
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jfoa-build-reports-${{ runner.os }}
           path: tmp.${{ matrix.os  }}.tar.gz
@@ -322,7 +322,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
 
       - name: Install libudev
@@ -359,7 +359,7 @@ jobs:
           tar -zcvf tmp.${{ matrix.os  }}.tar.gz packages/sync-test/tmp
       - name: Publish reports
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jfoa-build-reports-wasm-${{ runner.os }}
           path: tmp.${{ matrix.os  }}.tar.gz
