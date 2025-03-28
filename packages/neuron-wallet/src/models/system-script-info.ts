@@ -115,7 +115,7 @@ export default class SystemScriptInfo {
     this.daoOutPointInfo.set(genesisBlockHash, new OutPoint(daoOutPointTxHash, '2'))
 
     // set multi sign info
-    const multiSignOutPointTxHash = "0x840201d0a8b874d23a9291cad84f85a336ed51bce4eaaed34d2e519a67ebe8b1"
+    const multiSignOutPointTxHash = "0x2eefdeb21f3a3edf697c28a52601b4419806ed60bb427420455cc29a090b26d5"
     this.multiSignOutPointInfo.set(genesisBlockHash, new OutPoint(multiSignOutPointTxHash, '0'))
   }
 }
