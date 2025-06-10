@@ -15,7 +15,7 @@ jobs:
           - 20.15.1
         os:
           - macos-latest
-          - ubuntu-20.04
+          - ubuntu-22.04
           - windows-2022
 
     runs-on: ${{ matrix.os }}
@@ -131,7 +131,7 @@ jobs:
         shell: cmd
 
       - name: Install libudev
-        if: matrix.os == 'ubuntu-20.04'
+        if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libudev-dev
@@ -189,7 +189,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Package for Linux
-        if: matrix.os == 'ubuntu-20.04'
+        if: matrix.os == 'ubuntu-22.04'
         run: |
           ./scripts/download-ckb.sh
           yarn package:test linux
@@ -233,7 +233,7 @@ jobs:
           path: release/Neuron-*-setup.exe
 
       - name: Upload Neuron Linux
-        if: matrix.os == 'ubuntu-20.04'
+        if: matrix.os == 'ubuntu-22.04'
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Linux
@@ -288,7 +288,7 @@ jobs:
           - 18.12.0
         os:
           - macos-latest
-          - ubuntu-20.04
+          - ubuntu-22.04
           - windows-2022
 
     runs-on: ${{ matrix.os }}
@@ -301,7 +301,7 @@ jobs:
 
 
       - name: Install libudev
-        if: matrix.os == 'ubuntu-20.04'
+        if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libudev-dev
@@ -320,7 +320,7 @@ jobs:
           path: packages/sync-test
 
       - name: Download Neuron Linux
-        if: matrix.os == 'ubuntu-20.04'
+        if: matrix.os == 'ubuntu-22.04'
         uses: actions/download-artifact@v4
         with:
           name: Neuron-Linux
@@ -341,7 +341,7 @@ jobs:
           .\scripts\prepare_neuron_windows.bat
           yarn sync-test
       - name: ubuntu run
-        if: matrix.os == 'ubuntu-20.04'
+        if: matrix.os == 'ubuntu-22.04'
         run: |
           cd  packages/sync-test
           yarn
@@ -366,7 +366,7 @@ jobs:
         node:
           - 18.12.0
         os:
-          - ubuntu-20.04
+          - ubuntu-22.04
 
     runs-on: ${{ matrix.os }}
 
@@ -378,7 +378,7 @@ jobs:
 
 
       - name: Install libudev
-        if: matrix.os == 'ubuntu-20.04'
+        if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libudev-dev
@@ -389,13 +389,13 @@ jobs:
           name: Neuron-Mac-x64
           path: packages/sync-test
       - name: Download Neuron Linux
-        if: matrix.os == 'ubuntu-20.04'
+        if: matrix.os == 'ubuntu-22.04'
         uses: actions/download-artifact@v4
         with:
           name: Neuron-Linux
           path: packages/sync-test
       - name: ubuntu run
-        if: matrix.os == 'ubuntu-20.04'
+        if: matrix.os == 'ubuntu-22.04'
         run: |
           cd  packages/sync-test
           yarn
