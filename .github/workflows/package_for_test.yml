@@ -402,6 +402,7 @@ jobs:
           bash scripts/prepare_neuron_linux.sh
           git clone https://github.com/gpBlockchain/ckb-light-wasm-demo.git
           cd ckb-light-wasm-demo
+          git checkout fix-tx
           git submodule update --init --recursive
           bash build.sh
           cd ../
