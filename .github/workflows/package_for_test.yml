@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         node:
-          - 20.15.1
+          - 22.9.0
         os:
           - macos-latest
           - ubuntu-22.04
