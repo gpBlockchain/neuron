@@ -65,16 +65,18 @@ export const startCkbNodeWithData = async (option: {
       retries: 100,
     }
   )
+  console.info('CKB started', BI.from(tipBlock).toNumber())
   await retry(
     () =>
       ckbRpc.getIndexerTip().then(res => {
+        console.log('indexer tip block number:', BI.from(res.blockNumber).toNumber())
         if (Number(res.blockNumber) < BI.from(tipBlock).toNumber()) return Promise.reject()
         return res
       }),
     {
-      timeout: 60_000,
-      delay: 100,
-      retries: 100,
+      timeout: 120_000,
+      delay: 1000,
+      retries: 120,
     }
   )
   console.info('CKB started', BI.from(tipBlock).toNumber())
