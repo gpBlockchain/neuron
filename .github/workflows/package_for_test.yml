@@ -296,11 +296,11 @@ jobs:
           bash scripts/prepare_neuron_linux.sh
           xvfb-run --auto-servernum yarn sync-test
       - name: tar result
-        if: always()
+        if: ${{ failure() || cancelled() }}
         run: |
           tar -zcvf tmp.${{ matrix.os  }}.tar.gz packages/sync-test/tmp
       - name: Publish reports
-        if: failure()
+        if: ${{ failure() || cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: jfoa-build-reports-${{ runner.os }}
@@ -356,11 +356,11 @@ jobs:
           cd ../
           xvfb-run --auto-servernum yarn sync-wasm-test
       - name: tar result
-        if: always()
+        if: ${{ failure() || cancelled() }}
         run: |
           tar -zcvf tmp.${{ matrix.os  }}.tar.gz packages/sync-test/tmp
       - name: Publish reports
-        if: failure()
+        if: ${{ failure() || cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: jfoa-build-reports-wasm-${{ runner.os }}
