@@ -235,7 +235,6 @@ jobs:
         node:
           - 20.19.0
         os:
-          - macos-latest
           - ubuntu-22.04
           - windows-2022
 
@@ -350,7 +349,7 @@ jobs:
           bash scripts/prepare_neuron_linux.sh
           git clone https://github.com/gpBlockchain/ckb-light-wasm-demo.git
           cd ckb-light-wasm-demo
-          git checkout fix-tx
+          git checkout gp/support-sqlite
           git submodule update --init --recursive
           bash build.sh
           cd ../
