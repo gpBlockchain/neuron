@@ -456,15 +456,17 @@ jobs:
           path: packages/sync-test
       - name: ubuntu run
         if: matrix.os == 'ubuntu-22.04'
+        env:
+          CKB_LIGHT_CLIENT_URL: 'https://github.com/Officeyutong/ckb-light-client.git'
+          CKB_LIGHT_CLIENT_BRANCH: 'use-trait-for-storage-functions'
         run: |
           cd  packages/sync-test
           yarn
           bash scripts/prepare_neuron_linux.sh
           git clone https://github.com/gpBlockchain/ckb-light-wasm-demo.git
           cd ckb-light-wasm-demo
-          git checkout gp/support-wasm-node
           git submodule update --init --recursive
-          bash build_node.sh
+          bash build.sh
           cd ../
           xvfb-run --auto-servernum yarn sync-wasm-test
       - name: tar result
