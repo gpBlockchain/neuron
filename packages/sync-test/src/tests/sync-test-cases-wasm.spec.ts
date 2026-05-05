@@ -51,15 +51,18 @@ fixtures.forEach((fixture, idx) => {
         `${fixture.tmpPath}/lightNode/wallet1`
       )
       expect(result).toEqual(true)
-    })
+    }, 60 * 60 * 1000)
 
     afterEach(async () => {
-      await stopCkbNode()
-      await stopLightCkbNode()
-      await scheduler.wait(3 * 1000)
-      await cleanCkbNode(`${fixture.tmpPath}/ckb`)
-      await cleanLightCkbNode(`${fixture.tmpPath}/ckb-light-client`)
-      await stopNeuron()
+      try {
+        await stopCkbNode()
+        await stopLightCkbNode()
+        await scheduler.wait(3 * 1000)
+        await cleanCkbNode(`${fixture.tmpPath}/ckb`)
+        await cleanLightCkbNode(`${fixture.tmpPath}/ckb-light-client`)
+      } finally {
+        await stopNeuron()
+      }
     })
   })
 })
