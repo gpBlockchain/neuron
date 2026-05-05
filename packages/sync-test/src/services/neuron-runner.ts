@@ -9,6 +9,7 @@ import { BI, RPC } from '@ckb-lumos/lumos'
 import { scheduler } from 'timers/promises'
 
 let neuron: ChildProcess | null = null
+let neuronLogStream: fs.WriteStream | null = null
 
 let syncResult: {
   result: boolean
@@ -19,6 +20,9 @@ let syncResult: {
   syncTipNumTimes: 0,
   tipNum: 0,
 }
+
+const STOP_TIMEOUT_MS = 30_000
+let stdoutBuffer = ''
 
 export const getNeuronPath = () => {
   switch (platform()) {
@@ -96,52 +100,72 @@ export const startNeuronWithConfig = async (option: {
   cpSync(option.wallets.walletsPath, path.join(getNeuronPath(), ...['wallets']), { recursive: true })
 
   // start
+  stdoutBuffer = ''
   neuron = spawn(getNeuronStartCmd(), {
     cwd: option.neuronCodePath,
     stdio: ['ignore', 'pipe', 'pipe'],
     // detached: true,
     // shell: true,
   })
-  let log = fs.createWriteStream(option.logPath)
+  neuronLogStream = fs.createWriteStream(option.logPath)
+  const log = neuronLogStream
   neuron.stderr &&
     neuron.stderr.on('data', data => {
       log.write(data)
     })
   neuron.stdout &&
     neuron.stdout.on('data', data => {
-      if (!syncResult.result && data.toString().includes('saved synced block')) {
-        let result = checkLogForNumber(data.toString())
-        if (result) {
-          syncResult.syncTipNumTimes += 1
-        }
-        if (syncResult.syncTipNumTimes >= 3) {
-          syncResult.result = true
+      log.write(data)
+      if (!syncResult.result) {
+        stdoutBuffer += data.toString()
+        const lines = stdoutBuffer.split('\n')
+        stdoutBuffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (line.includes('saved synced block')) {
+            checkLineForSyncProgress(line)
+          }
         }
       }
-      log.write(data)
     })
 }
 
-function checkLogForNumber(log: string): boolean {
-  const regex = /#(\d+)/
-  const match = log.match(regex)
-  if (match) {
+function checkLineForSyncProgress(line: string): void {
+  const regex = /saved synced block #(\d+)/g
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(line)) !== null) {
     const number = parseInt(match[1], 10)
     console.log(
       `neuron sync:${number},neuron tipNum:${syncResult.tipNum},syncTipNumTimes:${syncResult.syncTipNumTimes}`
     )
     if (number > syncResult.tipNum) {
       syncResult.tipNum = number
-      return true
+      syncResult.syncTipNumTimes += 1
+      if (syncResult.syncTipNumTimes >= 3) {
+        syncResult.result = true
+      }
     }
   }
-  return false
 }
 
 export const waitNeuronSyncSuccess = async (retries: number) => {
+  const ckbRpc = new RPC(CKB_RPC_URL)
+  let currentTip = syncResult.tipNum
   for (let i = 0; i < retries; i++) {
     if (syncResult.result) {
       return syncResult.result
+    }
+    // Refresh the chain tip every ~5 seconds and check proximity
+    if (i % 5 === 0) {
+      try {
+        const tipNumber = await ckbRpc.getTipBlockNumber()
+        currentTip = BI.from(tipNumber).toNumber()
+      } catch {
+        // ignore RPC errors, keep last known tip
+      }
+      if (currentTip > 0 && syncResult.tipNum > 0 && syncResult.tipNum >= currentTip - 5) {
+        syncResult.result = true
+        return true
+      }
     }
     await scheduler.wait(1000)
   }
@@ -150,22 +174,49 @@ export const waitNeuronSyncSuccess = async (retries: number) => {
 
 export const stopNeuron = async () => {
   console.log('stop neuron')
-  return new Promise<void>(resolve => {
-    if (neuron) {
-      console.info('neuron:\tkilling neuron')
-      neuron.once('close', () => resolve())
-      neuron.kill()
-      console.log('neuron: stop succ')
-      neuron = null
-      syncResult = {
-        syncTipNumTimes: 0,
-        result: false,
-        tipNum: 0,
-      }
-    } else {
+  const p = neuron
+  const log = neuronLogStream
+  neuron = null
+  neuronLogStream = null
+  stdoutBuffer = ''
+  syncResult = {
+    syncTipNumTimes: 0,
+    result: false,
+    tipNum: 0,
+  }
+  if (!p) {
+    log?.end()
+    return
+  }
+  console.info('neuron:\tkilling neuron')
+  await new Promise<void>(resolve => {
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      try {
+        p.stdout?.removeAllListeners()
+        p.stderr?.removeAllListeners()
+      } catch {}
       resolve()
     }
+    const timer = setTimeout(() => {
+      try {
+        p.kill('SIGKILL')
+      } catch {}
+      finish()
+    }, STOP_TIMEOUT_MS)
+    p.once('close', finish)
+    p.once('exit', finish)
+    try {
+      p.kill('SIGTERM')
+    } catch {
+      finish()
+    }
   })
+  console.log('neuron: stop succ')
+  log?.end()
 }
 
 export const cleanNeuronSyncCells = () => {

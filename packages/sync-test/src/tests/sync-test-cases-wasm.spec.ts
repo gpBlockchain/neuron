@@ -29,37 +29,44 @@ fixtures.forEach((fixture, idx) => {
       })
     })
 
-    it('light node sync  wallet 1', async () => {
-      await startNeuronWithConfig({
-        cleanCells: true,
-        envPath: fixture.neuronEnv,
-        network: { indexJsonPath: NEURON_CONFIG_DATA.networks.light },
-        wallets: {
-          walletsPath: fixture.syncAccount.path,
-        },
-        neuronCodePath: NEURON_CONFIG_DATA.binPath,
-        logPath: `${fixture.tmpPath}/neuron-light-node-wallet-${idx}.log`,
-      })
-      await waitNeuronSyncSuccess(60 * 60)
-      await stopNeuron()
-      console.log('backupNeuronCells')
-      await backupNeuronCells(`${fixture.tmpPath}/lightNode/wallet1`)
-      console.log('compareNeuronDatabase')
-      const result = await compareNeuronDatabase(
-        fixture.compareLightNodeSqlitePath,
-        `${fixture.tmpPath}/lightNode/wallet1/light-${CKB_CONFIG.genesisHash}.sqlite`,
-        `${fixture.tmpPath}/lightNode/wallet1`
-      )
-      expect(result).toEqual(true)
-    })
+    it(
+      'light node sync  wallet 1',
+      async () => {
+        await startNeuronWithConfig({
+          cleanCells: true,
+          envPath: fixture.neuronEnv,
+          network: { indexJsonPath: NEURON_CONFIG_DATA.networks.light },
+          wallets: {
+            walletsPath: fixture.syncAccount.path,
+          },
+          neuronCodePath: NEURON_CONFIG_DATA.binPath,
+          logPath: `${fixture.tmpPath}/neuron-light-node-wallet-${idx}.log`,
+        })
+        await waitNeuronSyncSuccess(60 * 60)
+        await stopNeuron()
+        console.log('backupNeuronCells')
+        await backupNeuronCells(`${fixture.tmpPath}/lightNode/wallet1`)
+        console.log('compareNeuronDatabase')
+        const result = await compareNeuronDatabase(
+          fixture.compareLightNodeSqlitePath,
+          `${fixture.tmpPath}/lightNode/wallet1/light-${CKB_CONFIG.genesisHash}.sqlite`,
+          `${fixture.tmpPath}/lightNode/wallet1`
+        )
+        expect(result).toEqual(true)
+      },
+      60 * 60 * 1000
+    )
 
     afterEach(async () => {
-      await stopCkbNode()
-      await stopLightCkbNode()
-      await scheduler.wait(3 * 1000)
-      await cleanCkbNode(`${fixture.tmpPath}/ckb`)
-      await cleanLightCkbNode(`${fixture.tmpPath}/ckb-light-client`)
-      await stopNeuron()
+      try {
+        await stopCkbNode()
+        await stopLightCkbNode()
+        await scheduler.wait(3 * 1000)
+        await cleanCkbNode(`${fixture.tmpPath}/ckb`)
+        await cleanLightCkbNode(`${fixture.tmpPath}/ckb-light-client`)
+      } finally {
+        await stopNeuron()
+      }
     })
   })
 })

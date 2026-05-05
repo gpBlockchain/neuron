@@ -18,4 +18,5 @@ module.exports = {
     // "logger": "<rootDir>/tests/mock/logger",
   },
   testTimeout: 1800000,
+  forceExit: true,
 }
