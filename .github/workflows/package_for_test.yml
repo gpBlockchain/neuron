@@ -251,7 +251,7 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libudev-dev
+          sudo apt-get install -y libudev-dev libusb-1.0-0-dev
       - name: Download Neuron App Zip(x64)
         if: matrix.os == 'macos-latest'
         uses: actions/download-artifact@v4
@@ -328,7 +328,7 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libudev-dev
+          sudo apt-get install -y libudev-dev libusb-1.0-0-dev
       - name: Download Neuron App Zip(x64)
         if: matrix.os == 'macos-latest'
         uses: actions/download-artifact@v4
