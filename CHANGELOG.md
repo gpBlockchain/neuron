@@ -1,3 +1,117 @@
+# 0.204.1 (2026-04-10)
+
+### CKB Node & Light Client
+
+- [CKB@v0.204.0](https://github.com/nervosnetwork/ckb/releases/tag/v0.204.0) was released on Dec. 15th, 2025. This version of CKB node is now bundled and preconfigured in Neuron.
+- [CKB Light Client@v0.5.4](https://github.com/nervosnetwork/ckb-light-client/releases/tag/v0.5.4) was released on Jan. 2nd, 2026. This version of CKB Light Client is now bundled and preconfigured in Neuron
+
+### Assumed valid target
+
+Block before `0xa76ecc34238a30151211f63a09e6063ac7e7e760866b9be73b7560e3a95d3a50`(at height `18,298,596`) will be skipped in validation.(https://github.com/nervosnetwork/neuron/pull/3428)
+
+---
+
+## Bug fixes
+
+- #3465: Harden release notes rendering and privileged window navigation.(@zhangyaning)
+
+**Full Changelog**: https://github.com/nervosnetwork/neuron/compare/v0.204.0...v0.204.1
+
+# 0.204.0 (2026-01-12)
+
+### Caveat
+
+We changed the AppId for some reasons. If automatic updates fail, please download it manually.
+
+### CKB Node & Light Client
+
+- [CKB@v0.204.0](https://github.com/nervosnetwork/ckb/releases/tag/v0.204.0) was released on Dec. 15th, 2025. This version of CKB node is now bundled and preconfigured in Neuron.
+- [CKB Light Client@v0.5.4](https://github.com/nervosnetwork/ckb-light-client/releases/tag/v0.5.4) was released on Jan. 2nd, 2026. This version of CKB Light Client is now bundled and preconfigured in Neuron
+
+### Assumed valid target
+
+Block before `0xa76ecc34238a30151211f63a09e6063ac7e7e760866b9be73b7560e3a95d3a50`(at height `18,298,596`) will be skipped in validation.(https://github.com/nervosnetwork/neuron/pull/3428)
+
+**Full Changelog**: https://github.com/nervosnetwork/neuron/compare/v0.202.1...v0.204.0
+
+# 0.202.1 (2025-07-02)
+
+### CKB Node & Light Client
+
+- [CKB@v0.202.0](https://github.com/nervosnetwork/ckb/releases/tag/v0.202.0) was released on Jun. 12th, 2025. This version of CKB node is now bundled and preconfigured in Neuron.
+- [CKB Light Client@v0.5.1](https://github.com/nervosnetwork/ckb-light-client/releases/tag/v0.5.1) was released on Jul. 1st, 2025. This version of CKB Light Client is now bundled and preconfigured in Neuron
+
+### Assumed valid target
+
+Block before `0x49d2e56c7b595ebb61d1fee94b2814e83942064ce3ff91a175adbec0c14d26f7`(at height `16,588,228`) will be skipped in validation.(https://github.com/nervosnetwork/neuron/pull/3384)
+
+**Full Changelog**: https://github.com/nervosnetwork/neuron/compare/v0.202.0...v0.202.1
+
+
+# 0.202.0 (2025-06-25)
+
+### Caveat
+
+The [CKB 2023](https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0051-ckb2023/0051-ckb2023.md) Hardfork will be activated at **Epoch 12,293**(estimated 2025-07-01) and requires **CKB@v0.200.0** or **Light Client@v0.5.0** and above.
+
+To ensure synchronization after the hardfork, please upgrade Neuron to [v0.201.0](https://github.com/nervosnetwork/neuron/releases/tag/v0.201.0) or later for full node users, and to [v0.202.0](https://github.com/nervosnetwork/neuron/releases/tag/v0.202.0) or later for light client users.
+
+Visit https://explorer.nervos.org/hardfork for more information about the hardfork.
+
+### CKB Node & Light Client
+
+- [CKB@v0.202.0](https://github.com/nervosnetwork/ckb/releases/tag/v0.202.0) was released on Jun. 12th, 2025. This version of CKB node is now bundled and preconfigured in Neuron.
+- [CKB Light Client@v0.5.0](https://github.com/nervosnetwork/ckb-light-client/releases/tag/v0.5.0) was released on Jun. 19th, 2025. This version of CKB Light Client is now bundled and preconfigured in Neuron
+
+### Assumed valid target
+
+Block before `0x6676e2c4ef75afd8ef00a61d21a230fbe83c672e6a89dc60dcb41879884979a1`(at height `16,517,698`) will be skipped in validation.(https://github.com/nervosnetwork/neuron/pull/3376)
+
+**Full Changelog**: https://github.com/nervosnetwork/neuron/compare/v0.201.0...v0.202.0
+
+
+# 0.201.0 (2025-05-30)
+
+### Caveat
+
+The [CKB 2023](https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0051-ckb2023/0051-ckb2023.md) Hardfork will be activated at **Epoch 12,293**(estimated 2025-07-01) and requires **CKB@v0.200.0** or **Light Client@v0.4.0** and above.
+
+To ensure synchronization after the hardfork, please upgrade Neuron to [v0.201.0](https://github.com/nervosnetwork/neuron/releases/tag/v0.201.0) or later for full node users, and to [v0.119.0](https://github.com/nervosnetwork/neuron/releases/tag/v0.119.0) or later for light client users.
+
+Visit https://explorer.nervos.org/hardfork for more information about the hardfork.
+
+### CKB Node & Light Client
+
+- [CKB@v0.201.0](https://github.com/nervosnetwork/ckb/releases/tag/v0.201.0) was released on Apr. 3rd, 2025. This version of CKB node is now bundled and preconfigured in Neuron.
+- [CKB Light Client@v0.4.1](https://github.com/nervosnetwork/ckb-light-client/releases/tag/v0.4.1) was released on Nov. 13th, 2024. This version of CKB Light Client is now bundled and preconfigured in Neuron
+
+### Assumed valid target
+
+Block before `0x8d98cc0af11e54e7c66b10d188cea7bd1ec33acee624eb0fddd9bb6951cf720e`(at height `16,284,813`) will be skipped in validation.(https://github.com/nervosnetwork/neuron/pull/3357)
+
+---
+
+[![Neuron@v0.201.0](https://github.com/user-attachments/assets/0195090e-b178-4a23-9068-fc0df9d615cd)](https://youtu.be/JFe0Pwr4Io0)
+
+YouTube: https://youtu.be/JFe0Pwr4Io0
+
+---
+
+## New features
+
+- #3323: Support UDT destruction.(@devchenyan)
+- #3329, #3347: Introduce new Multisig Script, and support Nervos DAO with it.(@devchenyan)
+
+## Bug fixes
+
+- #3317: Hide 'View Private Key' when it's a hardware wallet.(@devchenyan)
+- #3332: Better note for external node running without the indexer module enabled.(@devchenyan)
+- #3352: Fix screen flicker when connecting to external nodes running new versions.(@devchenyan)
+
+
+**Full Changelog**: https://github.com/nervosnetwork/neuron/compare/v0.121.1...v0.201.0
+
+
 # 0.121.1 (2025-02-13)
 
 ### CKB Node & Light Client

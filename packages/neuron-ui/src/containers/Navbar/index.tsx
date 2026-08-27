@@ -111,11 +111,38 @@ const Navbar = () => {
     }
   }, [network?.readonly])
 
-  const gotoCompatile = useCallback(() => {
+  const gotoCompatible = useCallback(() => {
     openExternal(`https://neuron.magickbase.com${i18n.language.startsWith('zh') ? '/zh' : ''}/download`)
   }, [i18n.language])
 
   useEffect(() => {
+    if (verifyCkbResult && !verifyCkbResult.withIndexer) {
+      showGlobalAlertDialog({
+        type: 'warning',
+        message: t('navbar.ckb-without-indexer'),
+        action: 'ok',
+      })(dispatch)
+      return
+    }
+
+    if (verifyCkbResult && !verifyCkbResult.ckbIsCompatible) {
+      showGlobalAlertDialog({
+        type: 'warning',
+        message: (
+          <Trans
+            i18nKey="navbar.ckb-node-compatible"
+            values={{ version: getVersion(), btnText: t('navbar.learn-more') }}
+            components={[
+              <button type="button" className={styles.learnMore} onClick={gotoCompatible}>
+                {t('navbar.learn-more')}
+              </button>,
+            ]}
+          />
+        ),
+        action: 'ok',
+      })(dispatch)
+    }
+
     // isUpdated is true or version is not empty means check update has return
     if (!verifyCkbResult || (isUpdated !== true && !version)) {
       return
@@ -124,28 +151,6 @@ const Navbar = () => {
       showGlobalAlertDialog({
         type: 'warning',
         message: t('navbar.update-neuron-with-ckb', { version: getVersion() }),
-        action: 'ok',
-      })(dispatch)
-    } else if (!verifyCkbResult.ckbIsCompatible) {
-      showGlobalAlertDialog({
-        type: 'warning',
-        message: (
-          <Trans
-            i18nKey="navbar.ckb-node-compatible"
-            values={{ version: getVersion(), btnText: t('navbar.learn-more') }}
-            components={[
-              <button type="button" className={styles.learnMore} onClick={gotoCompatile}>
-                {t('navbar.learn-more')}
-              </button>,
-            ]}
-          />
-        ),
-        action: 'ok',
-      })(dispatch)
-    } else if (!verifyCkbResult.withIndexer) {
-      showGlobalAlertDialog({
-        type: 'warning',
-        message: t('navbar.ckb-without-indexer'),
         action: 'ok',
       })(dispatch)
     }

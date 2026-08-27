@@ -170,7 +170,7 @@ export default {
         title: '内置 CKB 节点',
         message: '缺少必要的依赖',
         detail:
-          'Neuron 中的网络节点依赖C++组件,请安装 x64 最新版本的 Microsoft Visual C++Redistributable 来保证软件正常运行。',
+          'Neuron 的内置 CKB 节点需要最新 x64 版本的 Microsoft Visual C++ Redistributable。当前版本缺失或过旧，请安装最新版以保证软件正常运行。',
         buttons: {
           'install-and-exit': '安装并退出',
         },
@@ -215,6 +215,12 @@ export default {
         buttons: {
           cancel: '取消',
           ignore: '忽略并继续',
+        },
+      },
+      'unrecognized-multisig-transaction': {
+        message: '这是一笔多签交易。请使用对应的钱包在多签地址中批准该交易。',
+        buttons: {
+          cancel: '取消',
         },
       },
     },

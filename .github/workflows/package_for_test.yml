@@ -11,12 +11,11 @@ jobs:
 
     strategy:
       matrix:
-        node:
-          - 20.15.1
+        node: [22]
         os:
-          - macos-latest
-          - ubuntu-20.04
-          - windows-2019
+          - macos-15-intel
+          - ubuntu-latest
+          - windows-2022
 
     runs-on: ${{ matrix.os }}
 
@@ -25,10 +24,6 @@ jobs:
       pull-requests: read
 
     name: ${{ matrix.os }}(Node.js ${{ matrix.node }})
-
-    env:
-      MAC_SHOULD_CODE_SIGN: ${{ github.event_name != 'pull_request' && secrets.APPLE_ID != '' }}
-      WIN_CERTIFICATE_BASE64: ${{ secrets.WIN_CERTIFICATE_BASE64 }}
 
     steps:
       - name: Set git to use LF
@@ -92,49 +87,16 @@ jobs:
           key: 2022-12-21-${{ runner.os }}-${{ hashFiles('**/yarn.lock')}}
 
       - name: Add msbuild to PATH
-        if: matrix.os == 'windows-2019'
+        if: runner.os == 'Windows'
         uses: microsoft/setup-msbuild@v2
         env:
           ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
 
-      - name: Setup Certificate
-        if: matrix.os == 'windows-2019'
-        run: |
-          echo "${{ secrets.SM_CLIENT_CERT_FILE_BASE64 }}" | base64 --decode > /d/Certificate_pkcs12.p12
-        shell: bash
-
-      - name: Set variables
-        if: matrix.os == 'windows-2019'
-        run: |
-          echo "SM_KEYPAIR_NAME=${{ secrets.SM_KEYPAIR_ALIAS }}" >> "$GITHUB_ENV"
-          echo "SM_HOST=${{ secrets.SM_HOST }}" >> "$GITHUB_ENV"
-          echo "SM_API_KEY=${{ secrets.SM_API_KEY }}" >> "$GITHUB_ENV"
-          echo "SM_CLIENT_CERT_FILE=D:\\Certificate_pkcs12.p12" >> "$GITHUB_ENV"
-          echo "SM_CLIENT_CERT_PASSWORD=${{ secrets.SM_CLIENT_CERT_PASSWORD }}" >> "$GITHUB_ENV"
-          echo "C:\Program Files (x86)\Windows Kits\10\App Certification Kit" >> $GITHUB_PATH
-          echo "C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools" >> $GITHUB_PATH
-          echo "C:\Program Files\DigiCert\DigiCert One Signing Manager Tools" >> $GITHUB_PATH
-        shell: bash
-
-      - name: Setting up the client tools
-        if: ${{ matrix.os == 'windows-2019' && env.SM_API_KEY != '' }}
-        run: |
-          curl -X GET  https://one.digicert.com/signingmanager/api-ui/v1/releases/smtools-windows-x64.msi/download -H "x-api-key:%SM_API_KEY%" -o smtools-windows-x64.msi
-          msiexec /i smtools-windows-x64.msi /quiet /qn
-          C:\Windows\System32\certutil.exe -csp "DigiCert Signing Manager KSP" -key -user
-        shell: cmd
-
-      - name: Certificates Sync
-        if: ${{ matrix.os == 'windows-2019' && env.SM_API_KEY != '' }}
-        run: |
-          smctl windows certsync
-        shell: cmd
-
-      - name: Install libudev
-        if: matrix.os == 'ubuntu-20.04'
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libudev-dev
+          sudo apt-get install -y libudev-dev libusb-1.0-0-dev
 
       - name: Install Lerna
         run: yarn global add lerna
@@ -154,21 +116,7 @@ jobs:
             fs.writeFileSync(ympPath, fs.readFileSync(ympPath).toString().replace('asar: true', 'asar: false'))
 
       - name: Package for MacOS
-        if: ${{ matrix.os == 'macos-latest' && env.MAC_SHOULD_CODE_SIGN == 'true' }}
-        run: |
-          ./scripts/download-ckb.sh mac
-          yarn package:test mac
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          CSC_LINK: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
-          TEAM_ID: ${{ secrets.TEAM_ID }}
-          USE_HARD_LINKS: false
-
-      - name: Package for MacOS for skip code sign
-        if: ${{ matrix.os == 'macos-latest' && env.MAC_SHOULD_CODE_SIGN == 'false' }}
+        if: runner.os == 'macOS'
         run: |
           export CSC_IDENTITY_AUTO_DISCOVERY=false
           ./scripts/download-ckb.sh mac
@@ -179,7 +127,7 @@ jobs:
           USE_HARD_LINKS: false
 
       - name: Package for Windows
-        if: matrix.os == 'windows-2019'
+        if: runner.os == 'Windows'
         run: |
           bash ./scripts/download-ckb.sh win
           yarn build
@@ -189,7 +137,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Package for Linux
-        if: matrix.os == 'ubuntu-20.04'
+        if: runner.os == 'Linux'
         run: |
           ./scripts/download-ckb.sh
           yarn package:test linux
@@ -198,42 +146,42 @@ jobs:
           USE_HARD_LINKS: false
 
       - name: Upload Neuron App Zip
-        if: matrix.os == 'macos-latest'
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Mac-x64
           path: release/Neuron-*-mac-x64.zip
 
       - name: Upload Neuron App Zip(arm64)
-        if: matrix.os == 'macos-latest'
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Mac-arm64
           path: release/Neuron-*-mac-arm64.zip
 
       - name: Upload Neuron Dmg
-        if: matrix.os == 'macos-latest'
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Dmg-x64
           path: release/Neuron-*-x64.dmg
 
       - name: Upload Neuron Dmg(arm64)
-        if: matrix.os == 'macos-latest'
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Dmg-arm64
           path: release/Neuron-*-arm64.dmg
 
       - name: Upload Neuron Win
-        if: matrix.os == 'windows-2019'
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Win
           path: release/Neuron-*-setup.exe
 
       - name: Upload Neuron Linux
-        if: matrix.os == 'ubuntu-20.04'
+        if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Linux

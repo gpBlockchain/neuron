@@ -2,6 +2,7 @@ import { In, LessThan, Not } from 'typeorm'
 import { computeScriptHash as scriptToHash } from '@ckb-lumos/lumos/utils'
 import SyncProgress, { SyncAddressType } from '../database/chain/entities/sync-progress'
 import WalletService from './wallets'
+import Script from '../models/chain/script'
 import { getConnection } from '../database/chain/connection'
 
 export default class SyncProgressService {
@@ -24,8 +25,8 @@ export default class SyncProgressService {
         },
       })
     const existHashes = new Set(existProgresses.map(v => v.hash))
-    const newSyncProgreses = syncProgresses.filter(v => !existHashes.has(v.hash))
-    await getConnection().manager.save(newSyncProgreses, { chunk: 100 })
+    const newSyncProgresses = syncProgresses.filter(v => !existHashes.has(v.hash))
+    await getConnection().manager.save(newSyncProgresses, { chunk: 100 })
   }
 
   static async updateSyncProgressFlag(existWalletIds: string[]) {
@@ -74,6 +75,11 @@ export default class SyncProgressService {
   static async getExistingSyncArgses() {
     const syncProgresses = await getConnection().getRepository(SyncProgress).createQueryBuilder().getMany()
     return new Set(syncProgresses.map(v => v.args))
+  }
+
+  static async getExistingSyncScripts() {
+    const syncProgresses = await getConnection().getRepository(SyncProgress).createQueryBuilder().getMany()
+    return new Set(syncProgresses.map(v => Script.fromObject(v).computeHash()))
   }
 
   static async getAllSyncStatusToMap() {

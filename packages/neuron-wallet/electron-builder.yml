@@ -1,5 +1,5 @@
-appId: com.nervos.neuron
-copyright: Copyright (C) 2019-2024 Nervos Foundation.
+appId: com.nervos.app5.neuron
+copyright: Copyright (C) 2019-2025 Nervos Foundation.
 productName: Neuron
 
 # This property will replace to false in package for test action
@@ -23,6 +23,9 @@ files:
 
 publish:
   - github
+
+toolsets:
+  appimage: "1.0.3"
 
 nsis:
   oneClick: false
@@ -52,9 +55,10 @@ win:
     - target: nsis
       arch:
         - x64
-  sign: scripts/customSign.js
-  signingHashAlgorithms:
-    - sha256
+  signtoolOptions:
+    sign: scripts/customSign.js
+    signingHashAlgorithms:
+      - sha256
 
 mac:
   artifactName: "${productName}-v${version}-${os}-${arch}.${ext}"
@@ -79,6 +83,7 @@ mac:
       arch:
         - arm64
         - x64
+  notarize: false # https://github.com/electron/notarize/issues/163#issuecomment-1726106735
 
 linux:
   artifactName: "${productName}-v${version}-${arch}.${ext}"

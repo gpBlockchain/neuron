@@ -136,7 +136,7 @@ export default {
       'multisig-lock-hash-mismatch': 'The current multisig address does not match the transaction to be approved',
       'sudt-acp-have-data': 'The destroying sUDT acp account have amount',
       'no-match-address-for-sign': 'Not found matched address',
-      'target-lock-error': 'CKB asset account can only transfer to sepe256k1 or acp address',
+      'target-lock-error': 'CKB asset account can only transfer to secp256k1 or acp address',
       'no-exist-ckb-node-data':
         '{{path}} has no CKB Node config and storage, press confirm to synchronize from scratch',
       'light-client-sudt-acp-error': "Light client mode doesn't support sending assets to other's asset account",
@@ -181,7 +181,7 @@ export default {
       'ckb-dependency': {
         title: 'Bundled CKB Node',
         message: 'Dependency Required',
-        detail: `The network nodes in Neuron rely on C++ components, so please install the latest version of Microsoft Visual C++Redistributable for x64 to ensure that the software runs properly.`,
+        detail: `The bundled CKB node in Neuron requires the latest Microsoft Visual C++ Redistributable for x64. The installed version is missing or too old, so please install the latest version to ensure that the software runs properly.`,
         buttons: {
           'install-and-exit': 'Install and Exit',
         },
@@ -228,6 +228,13 @@ export default {
         buttons: {
           cancel: 'Cancel',
           ignore: 'Ignore and continue',
+        },
+      },
+      'unrecognized-multisig-transaction': {
+        message:
+          'This is a multisig transaction. Please approve it from the multisig address using the appropriate wallet. ',
+        buttons: {
+          cancel: 'Cancel',
         },
       },
     },

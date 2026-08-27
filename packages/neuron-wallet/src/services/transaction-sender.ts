@@ -32,6 +32,7 @@ import {
   NoMatchAddressForSign,
   SignTransactionFailed,
   TransactionIsNotCommittedYet,
+  UnrecognizedLockScript,
 } from '../exceptions'
 import AssetAccountInfo from '../models/asset-account-info'
 import MultisigConfigModel from '../models/multisig-config'
@@ -61,7 +62,7 @@ interface PathAndPrivateKey {
 }
 
 export default class TransactionSender {
-  static MULTI_SIGN_ARGS_LENGTH = 58
+  static MULTISIGN_ARGS_LENGTH = 58
 
   private walletService: WalletService
 
@@ -147,7 +148,7 @@ export default class TransactionSender {
 
     // Only one multi sign input now.
     const isMultisig =
-      tx.inputs.length === 1 && tx.inputs[0].lock!.args.length === TransactionSender.MULTI_SIGN_ARGS_LENGTH
+      tx.inputs.length === 1 && tx.inputs[0].lock!.args.length === TransactionSender.MULTISIGN_ARGS_LENGTH
 
     const addressInfos = await this.getAddressInfos(walletID)
     const multiSignBlake160s = isMultisig
@@ -162,7 +163,7 @@ export default class TransactionSender {
     const pathAndPrivateKeys = this.getPrivateKeys(wallet, paths, password)
     const findPrivateKey = (args: string) => {
       let path: string | undefined
-      if (args.length === TransactionSender.MULTI_SIGN_ARGS_LENGTH) {
+      if (args.length === TransactionSender.MULTISIGN_ARGS_LENGTH) {
         path = multiSignBlake160s.find(i => args.slice(0, 42) === i.multiSignBlake160)!.path
       } else if (args.length === 42) {
         path = addressInfos.find(i => i.blake160 === args)!.path
@@ -206,18 +207,31 @@ export default class TransactionSender {
       } catch (error) {
         const BLOCK_UNRECOGNIZED = 0
         const IGNORE_UNRECOGNIZED_AND_CONTINUE = 1
+
+        let message = t('messageBox.unrecognized-lock-script.message')
+        let buttons = [
+          t('messageBox.unrecognized-lock-script.buttons.cancel'),
+          t('messageBox.unrecognized-lock-script.buttons.ignore'),
+        ]
+
+        const input = tx.inputs.find(input => input.lockHash === lockHash)
+        if (input && input.lock && SystemScriptInfo.isMultiSignCodeHash(input.lock.codeHash)) {
+          message = t('messageBox.unrecognized-multisig-transaction.message')
+          buttons = [t('messageBox.unrecognized-multisig-transaction.buttons.cancel')]
+        }
+
         const res = await dialog.showMessageBox({
           type: 'warning',
-          message: t('messageBox.unrecognized-lock-script.message'),
-          buttons: [
-            t('messageBox.unrecognized-lock-script.buttons.cancel'),
-            t('messageBox.unrecognized-lock-script.buttons.ignore'),
-          ],
+          message,
+          buttons,
           defaultId: BLOCK_UNRECOGNIZED,
           cancelId: IGNORE_UNRECOGNIZED_AND_CONTINUE,
         })
         if (res.response === IGNORE_UNRECOGNIZED_AND_CONTINUE) {
           continue
+        }
+        if (res.response === BLOCK_UNRECOGNIZED) {
+          throw new UnrecognizedLockScript(message)
         }
         throw error
       }
@@ -562,7 +576,7 @@ export default class TransactionSender {
       walletID: '',
       targetOutputs,
       fee: '0',
-      feeRate: '1000',
+      feeRate: '2000',
       multisigConfig,
     })
 
@@ -583,7 +597,8 @@ export default class TransactionSender {
         multisigConfig.blake160s,
         multisigConfig.r,
         multisigConfig.m,
-        multisigConfig.n
+        multisigConfig.n,
+        multisigConfig.lockCodeHash
       )
       const multisigAddresses = scriptToAddress(lockScript, NetworksService.getInstance().isMainnet())
       const tx: Transaction = await TransactionGenerator.generateTx({
@@ -591,11 +606,11 @@ export default class TransactionSender {
         targetOutputs,
         changeAddress: multisigAddresses,
         fee: '0',
-        feeRate: '1000',
+        feeRate: '2000',
         lockClass: {
           lockArgs: [lockScript.args],
-          codeHash: SystemScriptInfo.MULTI_SIGN_CODE_HASH,
-          hashType: SystemScriptInfo.MULTI_SIGN_HASH_TYPE,
+          codeHash: lockScript.codeHash,
+          hashType: lockScript.hashType,
         },
         multisigConfig,
       })
@@ -713,7 +728,8 @@ export default class TransactionSender {
       multisigConfig.blake160s,
       multisigConfig.r,
       multisigConfig.m,
-      multisigConfig.n
+      multisigConfig.n,
+      multisigConfig.lockCodeHash
     )
     const multisigAddresses = scriptToAddress(lockScript, NetworksService.getInstance().isMainnet())
 
@@ -726,8 +742,8 @@ export default class TransactionSender {
       feeRate,
       {
         lockArgs: [lockScript.args],
-        codeHash: SystemScriptInfo.MULTI_SIGN_CODE_HASH,
-        hashType: SystemScriptInfo.MULTI_SIGN_HASH_TYPE,
+        codeHash: lockScript.codeHash,
+        hashType: lockScript.hashType,
       },
       multisigConfig
     )
@@ -783,7 +799,8 @@ export default class TransactionSender {
       multisigConfig.blake160s,
       multisigConfig.r,
       multisigConfig.m,
-      multisigConfig.n
+      multisigConfig.n,
+      multisigConfig.lockCodeHash
     )
     const multisigAddresses = scriptToAddress(lockScript, NetworksService.getInstance().isMainnet())
 
@@ -811,8 +828,8 @@ export default class TransactionSender {
       feeRate,
       {
         lockArgs: [lockScript.args],
-        codeHash: SystemScriptInfo.MULTI_SIGN_CODE_HASH,
-        hashType: SystemScriptInfo.MULTI_SIGN_HASH_TYPE,
+        codeHash: lockScript.codeHash,
+        hashType: lockScript.hashType,
       },
       multisigConfig
     )
@@ -847,7 +864,7 @@ export default class TransactionSender {
     }
 
     const cellDep = multisigConfig
-      ? await SystemScriptInfo.getInstance().getMultiSignCellDep()
+      ? await SystemScriptInfo.getInstance().getMultiSignCellDep(multisigConfig.lockCodeHash)
       : await SystemScriptInfo.getInstance().getSecpCellDep()
     const daoCellDep = await SystemScriptInfo.getInstance().getDaoCellDep()
 
@@ -894,7 +911,8 @@ export default class TransactionSender {
         multisigConfig.blake160s,
         multisigConfig.r,
         multisigConfig.m,
-        multisigConfig.n
+        multisigConfig.n,
+        multisigConfig.lockCodeHash
       )
       output = new Output(outputCapacity.toString(), lockScript, undefined, '0x')
     } else {
@@ -979,7 +997,8 @@ export default class TransactionSender {
       multisigConfig.blake160s,
       multisigConfig.r,
       multisigConfig.m,
-      multisigConfig.n
+      multisigConfig.n,
+      multisigConfig.lockCodeHash
     )
     const multisigAddresses = scriptToAddress(lockScript, NetworksService.getInstance().isMainnet())
 
@@ -992,8 +1011,8 @@ export default class TransactionSender {
       feeRate,
       {
         lockArgs: [lockScript.args],
-        codeHash: SystemScriptInfo.MULTI_SIGN_CODE_HASH,
-        hashType: SystemScriptInfo.MULTI_SIGN_HASH_TYPE,
+        codeHash: lockScript.codeHash,
+        hashType: lockScript.hashType,
       },
       multisigConfig
     )
