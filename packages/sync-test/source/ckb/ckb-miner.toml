@@ -26,4 +26,4 @@ poll_interval = 500
 
 worker_type = 'Dummy'
 delay_type = 'Constant'
-value = 500
+value = 5000

@@ -1,6 +1,12 @@
 import { cleanCkbNode, startCkbMiner, startCkbNodeWithData, stopCkbNode } from '../services/ckb-runner'
 import { cleanLightCkbNode, startCkbLightNodeWithConfig, stopLightCkbNode } from '../services/light-runner-wasm'
-import { backupNeuronCells, startNeuronWithConfig, stopNeuron, waitNeuronSyncSuccess } from '../services/neuron-runner'
+import {
+  backupNeuronCells,
+  startNeuronWithConfig,
+  stopNeuron,
+  waitNeuronDatabaseSettled,
+  waitNeuronSyncSuccess,
+} from '../services/neuron-runner'
 import { scheduler } from 'timers/promises'
 
 import { compareNeuronDatabase } from '../services/neuron-sql-server'
@@ -8,7 +14,7 @@ import { compareNeuronDatabase } from '../services/neuron-sql-server'
 import { CKB_CONFIG, fixtures, NEURON_CONFIG_DATA } from './common'
 
 fixtures.forEach((fixture, idx) => {
-  describe('sync test', function () {
+  describe(`sync test: ${fixture.name}`, function () {
     beforeEach(async () => {
       console.log('before each')
       await startCkbNodeWithData({
@@ -18,10 +24,6 @@ fixtures.forEach((fixture, idx) => {
         decPath: `${fixture.tmpPath}/ckb`,
         richIndexer: fixture.richIndexer,
       })
-      await startCkbMiner({
-        binPath: CKB_CONFIG.binPath,
-        decPath: `${fixture.tmpPath}/ckb`,
-      })
       await startCkbLightNodeWithConfig({
         binPath: CKB_CONFIG.binPath,
         configPath: CKB_CONFIG.ckbLightClientConfigPath,
@@ -29,29 +31,40 @@ fixtures.forEach((fixture, idx) => {
       })
     })
 
-    it('light node sync  wallet 1', async () => {
-      await startNeuronWithConfig({
-        cleanCells: true,
-        envPath: fixture.neuronEnv,
-        network: { indexJsonPath: NEURON_CONFIG_DATA.networks.light },
-        wallets: {
-          walletsPath: fixture.syncAccount.path,
-        },
-        neuronCodePath: NEURON_CONFIG_DATA.binPath,
-        logPath: `${fixture.tmpPath}/neuron-light-node-wallet-${idx}.log`,
-      })
-      await waitNeuronSyncSuccess(60 * 60)
-      await stopNeuron()
-      console.log('backupNeuronCells')
-      await backupNeuronCells(`${fixture.tmpPath}/lightNode/wallet1`)
-      console.log('compareNeuronDatabase')
-      const result = await compareNeuronDatabase(
-        fixture.compareLightNodeSqlitePath,
-        `${fixture.tmpPath}/lightNode/wallet1/light-${CKB_CONFIG.genesisHash}.sqlite`,
-        `${fixture.tmpPath}/lightNode/wallet1`
-      )
-      expect(result).toEqual(true)
-    }, 60 * 60 * 1000)
+    it(
+      'light node sync  wallet 1',
+      async () => {
+        await startNeuronWithConfig({
+          cleanCells: true,
+          envPath: fixture.neuronEnv,
+          network: { indexJsonPath: NEURON_CONFIG_DATA.networks.light },
+          wallets: {
+            walletsPath: fixture.syncAccount.path,
+          },
+          neuronCodePath: NEURON_CONFIG_DATA.binPath,
+          logPath: `${fixture.tmpPath}/neuron-light-node-wallet-${idx}.log`,
+          userDataPath: `${fixture.tmpPath}/neuron-user-data-${process.pid}-wasm-light`,
+        })
+        await scheduler.wait(15 * 1000)
+        await startCkbMiner({
+          binPath: CKB_CONFIG.binPath,
+          decPath: `${fixture.tmpPath}/ckb`,
+        })
+        await waitNeuronSyncSuccess(60 * 60)
+        await waitNeuronDatabaseSettled(`light-${CKB_CONFIG.genesisHash}.sqlite`, fixture.compareLightNodeSqlitePath)
+        await stopNeuron()
+        console.log('backupNeuronCells')
+        await backupNeuronCells(`${fixture.tmpPath}/lightNode/wallet1`)
+        console.log('compareNeuronDatabase')
+        const result = await compareNeuronDatabase(
+          fixture.compareLightNodeSqlitePath,
+          `${fixture.tmpPath}/lightNode/wallet1/light-${CKB_CONFIG.genesisHash}.sqlite`,
+          `${fixture.tmpPath}/lightNode/wallet1`
+        )
+        expect(result).toEqual(true)
+      },
+      60 * 60 * 1000
+    )
 
     afterEach(async () => {
       try {

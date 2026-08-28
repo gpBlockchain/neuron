@@ -102,6 +102,9 @@ export class SqliteDataComparator {
       }
     } catch (err) {
       console.error(err)
+      this.compareResult[tableName] = false
+      this.compareResult.result = false
+      throw err
     }
   }
 

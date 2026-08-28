@@ -1,10 +1,12 @@
 import { ChildProcess, spawn } from 'child_process'
 import { platform, rm } from '../utils/utils'
-import { cpSync, mkdirSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync } from 'node:fs'
 import * as fs from 'fs'
 
 let ckbLight: ChildProcess | null = null
 let ckbLightLog: fs.WriteStream | null = null
+
+const STOP_TIMEOUT_MS = 30_000
 
 const ckbLightBinary = (binPath: string): string => {
   const binary = `${binPath}/ckb-light-client`
@@ -23,11 +25,15 @@ export const startCkbLightNodeWithConfig = async (option: { binPath: string; con
   if (ckbLight !== null) {
     console.info(`CKB:\tLight client is not closed, close it before start...`)
     await stopLightCkbNode()
-    await cleanLightCkbNode(option.decPath)
+  }
+  await cleanLightCkbNode(option.decPath)
+  const binary = ckbLightBinary(option.binPath)
+  if (!existsSync(binary)) {
+    throw new Error(`CKB Light Client binary does not exist: ${binary}`)
   }
   mkdirSync(option.decPath, { recursive: true })
   cpSync(option.configPath, option.decPath, { recursive: true })
-  cpSync(ckbLightBinary(option.binPath), ckbLightBinary(option.decPath))
+  cpSync(binary, ckbLightBinary(option.decPath))
   const options = ['run', '--config-file', 'config.toml']
   ckbLight = spawn(
     './' + ckbLightBinary(option.binPath).split('/')[ckbLightBinary(option.binPath).split('/').length - 1],
@@ -54,15 +60,35 @@ export const startCkbLightNodeWithConfig = async (option: { binPath: string; con
 export const stopLightCkbNode = async () => {
   console.log('stop ckb light node ')
   return new Promise<void>(resolve => {
-    if (ckbLight) {
+    const process = ckbLight
+    ckbLight = null
+    if (process && process.exitCode === null && process.signalCode === null) {
       console.info('CKB light:\tkilling node')
-      ckbLight.once('close', () => resolve())
-      ckbLight.kill()
+      let finished = false
+      const finish = () => {
+        if (finished) return
+        finished = true
+        clearTimeout(timer)
+        resolve()
+      }
+      const timer = setTimeout(() => {
+        try {
+          process.kill('SIGKILL')
+        } catch {}
+        finish()
+      }, STOP_TIMEOUT_MS)
+      process.once('close', finish)
+      process.once('exit', finish)
+      process.once('error', finish)
+      try {
+        process.kill('SIGTERM')
+      } catch {
+        finish()
+      }
       if (ckbLightLog) {
-        ckbLightLog.close()
+        ckbLightLog.end()
         ckbLightLog = null
       }
-      ckbLight = null
     } else {
       resolve()
     }

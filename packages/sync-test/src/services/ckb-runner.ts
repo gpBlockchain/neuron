@@ -1,7 +1,7 @@
 import { BI, RPC } from '@ckb-lumos/lumos'
 
 import { ChildProcess, StdioNull, StdioPipe, spawn } from 'child_process'
-import { mkdirSync, cpSync } from 'node:fs'
+import { mkdirSync, cpSync, existsSync } from 'node:fs'
 import { extractTarGz, platform, retry, rm } from '../utils/utils'
 import path from 'path'
 
@@ -12,6 +12,45 @@ export const CKB_RPC_URL = `http://${CKB_HOST}:${CKB_RPC_PORT}`
 
 let ckb: ChildProcess | null = null
 let ckbMiner: ChildProcess | null = null
+
+const STOP_TIMEOUT_MS = 30_000
+
+const assertBinaryExists = (binary: string) => {
+  if (!existsSync(binary)) {
+    throw new Error(`CKB binary does not exist: ${binary}`)
+  }
+}
+
+const stopProcess = (process: ChildProcess | null, name: string): Promise<void> => {
+  if (!process || process.exitCode !== null || process.signalCode !== null) {
+    return Promise.resolve()
+  }
+
+  return new Promise<void>(resolve => {
+    let finished = false
+    const finish = () => {
+      if (finished) return
+      finished = true
+      clearTimeout(timer)
+      resolve()
+    }
+    const timer = setTimeout(() => {
+      console.warn(`${name}:\tSIGTERM timeout; sending SIGKILL`)
+      try {
+        process.kill('SIGKILL')
+      } catch {}
+      finish()
+    }, STOP_TIMEOUT_MS)
+    process.once('close', finish)
+    process.once('exit', finish)
+    process.once('error', finish)
+    try {
+      process.kill('SIGTERM')
+    } catch {
+      finish()
+    }
+  })
+}
 
 const ckbBinary = (binPath: string): string => {
   const binary = `${binPath}/ckb`
@@ -36,9 +75,11 @@ export const startCkbNodeWithData = async (option: {
   if (ckb !== null) {
     console.info(`CKB:\tckb is not closed, close it before start...`)
     await stopCkbNode()
-    await cleanCkbNode(option.decPath)
   }
+  await cleanCkbNode(option.decPath)
   console.log('start ckb node ')
+  const binary = ckbBinary(option.binPath)
+  assertBinaryExists(binary)
   mkdirSync(option.decPath, { recursive: true })
   cpSync(option.configPath, option.decPath, { recursive: true })
   await extractTarGz(option.dataPath, path.join(option.decPath, ...['data']))
@@ -50,7 +91,7 @@ export const startCkbNodeWithData = async (option: {
     options.push('--indexer')
   }
   const stdio: (StdioNull | StdioPipe)[] = ['ignore', 'ignore', 'pipe']
-  ckb = spawn(ckbBinary(option.binPath), options, { stdio })
+  ckb = spawn(binary, options, { stdio })
   let ckbRpc = new RPC(CKB_RPC_URL)
 
   const tipBlock = await retry(
@@ -82,7 +123,7 @@ export const startCkbNodeWithData = async (option: {
   console.info('CKB started', BI.from(tipBlock).toNumber())
 }
 
-export const startCkbMiner = (option: { decPath: string; binPath: string }) => {
+export const startCkbMiner = (option: { decPath: string; binPath: string; limit?: number }) => {
   if (ckb == null) {
     console.error(`CKB:\tckb is not started, please start ckb before starting miner...`)
     return
@@ -91,41 +132,24 @@ export const startCkbMiner = (option: { decPath: string; binPath: string }) => {
     console.log('ckb miner already start ')
     return
   }
+  const binary = ckbBinary(option.binPath)
+  assertBinaryExists(binary)
   const options = ['miner', '-C', option.decPath]
+  if (option.limit !== undefined) {
+    options.push('--limit', option.limit.toString())
+  }
   const stdio: (StdioNull | StdioPipe)[] = ['ignore', 'ignore', 'pipe']
-  ckbMiner = spawn(ckbBinary(option.binPath), options, { stdio })
+  ckbMiner = spawn(binary, options, { stdio })
   console.log('start miner  successful')
 }
 
 export const stopCkbNode = async () => {
   console.log('stop ckb node ')
-  const promises: Promise<void>[] = []
-  promises.push(
-    new Promise<void>(innerResolve => {
-      if (!ckbMiner) {
-        innerResolve()
-      } else {
-        ckbMiner.once('close', () => innerResolve())
-        ckbMiner.kill()
-        ckbMiner = null
-      }
-    })
-  )
-  promises.push(
-    new Promise<void>(innerResolve => {
-      if (ckb) {
-        console.info('CKB:\tkilling node')
-        ckb.once('close', () => innerResolve())
-        ckb.kill()
-        ckb = null
-      } else {
-        innerResolve()
-      }
-    })
-  )
-  return new Promise<void>(resolve => {
-    Promise.all(promises).then(() => resolve())
-  })
+  const miner = ckbMiner
+  const node = ckb
+  ckbMiner = null
+  ckb = null
+  await Promise.all([stopProcess(miner, 'CKB miner'), stopProcess(node, 'CKB node')])
 }
 
 export const cleanCkbNode = async (decPath: string) => {
