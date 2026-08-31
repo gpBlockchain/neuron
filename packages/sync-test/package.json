@@ -19,6 +19,7 @@
     "sync-wasm-test": "jest sync-test-cases-wasm.spec.ts"
   },
   "dependencies": {
+    "@types/tar": "6.1.10",
     "tar": "6.2.1"
   }
 }
