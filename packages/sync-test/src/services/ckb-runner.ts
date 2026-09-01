@@ -101,9 +101,9 @@ export const startCkbNodeWithData = async (option: {
         return res
       }),
     {
-      timeout: 15_000,
-      delay: 100,
-      retries: 100,
+      timeout: 60_000,
+      delay: 250,
+      retries: 240,
     }
   )
   console.info('CKB started', BI.from(tipBlock).toNumber())
