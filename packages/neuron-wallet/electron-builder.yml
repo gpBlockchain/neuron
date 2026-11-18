@@ -14,7 +14,7 @@ afterSign: scripts/notarize.js
 files:
   - from: "../.."
     to: "."
-    filter: ["!**/*", ".ckb-version", ".ckb-light-version", "ormconfig.json", "compatible.json"]
+    filter: ["!**/*", ".ckb-version", ".ckb-light-version", "ormconfig.json", "compatible.json", "ckb-clients-manifest.json"]
   - package.json
   - dist
   - ".env"
