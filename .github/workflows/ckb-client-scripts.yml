@@ -1,0 +1,24 @@
+name: CKB client script tests
+
+on:
+  pull_request:
+    paths:
+      - scripts/lib/ckb-clients.sh
+      - scripts/download-ckb.sh
+      - scripts/resolve-ckb-client-env.sh
+      - scripts/tests/ckb-clients.test.sh
+      - .ckb-version
+      - .ckb-light-version
+      - .github/workflows/ckb-client-scripts.yml
+      - .github/workflows/package_for_test.yml
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run isolated client script tests
+        run: bash scripts/tests/ckb-clients.test.sh

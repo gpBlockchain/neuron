@@ -53,3 +53,6 @@ docs
 # sqlite db
 cell-dev.sqlite
 address-dev.sqlite
+
+# generated when packaging builtin CKB / light-client binaries
+/ckb-clients-manifest.json
