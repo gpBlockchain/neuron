@@ -1,13 +1,44 @@
 name: Package Neuron for Test
 
-on: 
+on:
+  workflow_dispatch:
+    inputs:
+      ckb_url:
+        description: "GitHub URL for CKB. Use https://github.com/<owner>/<repo>/releases/tag/<tag> to download that Release, or https://github.com/<owner>/<repo>/tree/<branch-or-tag> to build that ref from source. Leave empty to use ckb_repo/ckb_ref or the official Release."
+        type: string
+        default: ""
+      ckb_repo:
+        description: "CKB GitHub repo (owner/name). Leave empty for nervosnetwork/ckb. This is a text field, not a live branch list."
+        type: string
+        default: ""
+      ckb_ref:
+        description: "CKB branch, tag, or SHA to build from source (for example develop). Leave empty to use the official Release in .ckb-version."
+        type: string
+        default: ""
+      light_client_url:
+        description: "GitHub URL for ckb-light-client. Use https://github.com/<owner>/<repo>/releases/tag/<tag> to download that Release, or https://github.com/<owner>/<repo>/tree/<branch-or-tag> to build that ref from source. Leave empty to use light_client_repo/light_client_ref or the official Release."
+        type: string
+        default: ""
+      light_client_repo:
+        description: "ckb-light-client GitHub repo (owner/name). Leave empty for nervosnetwork/ckb-light-client. This is a text field, not a live branch list."
+        type: string
+        default: ""
+      light_client_ref:
+        description: "ckb-light-client branch, tag, or SHA to build from source (for example develop). Leave empty to use the official Release in .ckb-light-version."
+        type: string
+        default: ""
+      upload_packages:
+        description: "Upload packaged apps as artifacts. Forced off when a non-official client repo is used."
+        type: boolean
+        default: true
+
   issue_comment:
     types: [created]
   push:
 
 jobs:
   packaging:
-    if: ${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package') && contains(fromJSON('["OWNER", "COLLABORATOR"]'), github.event.comment.author_association)) || github.event_name == 'push' }}
+    if: ${{ ((github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package') && contains(fromJSON('["OWNER", "COLLABORATOR"]'), github.event.comment.author_association)) || github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip package]')) }}
 
     strategy:
       matrix:
@@ -31,9 +62,9 @@ jobs:
           git config --global core.autocrlf false
           git config --global core.eol lf
 
-      - name: Checkout for push
+      - name: Checkout for push or dispatch
         uses: actions/checkout@v4
-        if: ${{ github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
 
       - name: Checkout for PR
         uses: actions/checkout@v4
@@ -71,6 +102,45 @@ jobs:
               }
               page += 1
             }
+
+      - name: Resolve client sources
+        env:
+          PACKAGE_COMMENT_BODY: ${{ github.event.comment.body || '' }}
+          INPUT_CKB_SOURCE: ${{ inputs.ckb_source || '' }}
+          INPUT_CKB_REPO: ${{ inputs.ckb_repo || '' }}
+          INPUT_CKB_REF: ${{ inputs.ckb_ref || '' }}
+          INPUT_CKB_URL: ${{ inputs.ckb_url || '' }}
+          INPUT_CKB_ARTIFACT_RUN_ID: ${{ inputs.ckb_artifact_run_id || '' }}
+          INPUT_CKB_ARTIFACT_NAME: ${{ inputs.ckb_artifact_name || '' }}
+          INPUT_CKB_ASSET_NAME: ${{ inputs.ckb_asset_name || '' }}
+          INPUT_LIGHT_CLIENT_SOURCE: ${{ inputs.light_client_source || '' }}
+          INPUT_LIGHT_CLIENT_REPO: ${{ inputs.light_client_repo || '' }}
+          INPUT_LIGHT_CLIENT_REF: ${{ inputs.light_client_ref || '' }}
+          INPUT_LIGHT_CLIENT_URL: ${{ inputs.light_client_url || '' }}
+          INPUT_LIGHT_CLIENT_ARTIFACT_RUN_ID: ${{ inputs.light_client_artifact_run_id || '' }}
+          INPUT_LIGHT_CLIENT_ARTIFACT_NAME: ${{ inputs.light_client_artifact_name || '' }}
+          INPUT_LIGHT_CLIENT_ASSET_NAME: ${{ inputs.light_client_asset_name || '' }}
+          INPUT_UPLOAD_PACKAGES: ${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.upload_packages) || 'true' }}
+        run: bash scripts/resolve-ckb-client-env.sh >> "$GITHUB_ENV"
+
+      - name: Record upload decision
+        id: upload_decision
+        run: |
+          echo "should_upload=${CKB_CLIENTS_SHOULD_UPLOAD}" >> "$GITHUB_OUTPUT"
+          echo "sensitive=${CKB_CLIENTS_SENSITIVE}" >> "$GITHUB_OUTPUT"
+          if [ "${CKB_CLIENTS_SHOULD_UPLOAD}" != "true" ]; then
+            echo "Neuron package artifacts will not be uploaded from this public workflow run."
+          fi
+
+      - name: Setup Rust
+        if: ${{ env.CKB_SOURCE == 'source' || env.CKB_LIGHT_SOURCE == 'source' }}
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install source-build dependencies (Linux)
+        if: ${{ runner.os == 'Linux' && (env.CKB_SOURCE == 'source' || env.CKB_LIGHT_SOURCE == 'source') }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang libssl-dev pkg-config protobuf-compiler
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -123,6 +193,7 @@ jobs:
           yarn package:test mac
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CKB_CLIENT_TOKEN: ${{ secrets.NEURON_DEP_GITHUB_TOKEN }}
           SKIP_NOTARIZE: true
           USE_HARD_LINKS: false
 
@@ -135,6 +206,7 @@ jobs:
           bash ./scripts/package-for-test.sh win
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CKB_CLIENT_TOKEN: ${{ secrets.NEURON_DEP_GITHUB_TOKEN }}
 
       - name: Package for Linux
         if: runner.os == 'Linux'
@@ -143,45 +215,46 @@ jobs:
           yarn package:test linux
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CKB_CLIENT_TOKEN: ${{ secrets.NEURON_DEP_GITHUB_TOKEN }}
           USE_HARD_LINKS: false
 
       - name: Upload Neuron App Zip
-        if: runner.os == 'macOS'
+        if: ${{ runner.os == 'macOS' && env.CKB_CLIENTS_SHOULD_UPLOAD == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Mac-x64
           path: release/Neuron-*-mac-x64.zip
 
       - name: Upload Neuron App Zip(arm64)
-        if: runner.os == 'macOS'
+        if: ${{ runner.os == 'macOS' && env.CKB_CLIENTS_SHOULD_UPLOAD == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Mac-arm64
           path: release/Neuron-*-mac-arm64.zip
 
       - name: Upload Neuron Dmg
-        if: runner.os == 'macOS'
+        if: ${{ runner.os == 'macOS' && env.CKB_CLIENTS_SHOULD_UPLOAD == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Dmg-x64
           path: release/Neuron-*-x64.dmg
 
       - name: Upload Neuron Dmg(arm64)
-        if: runner.os == 'macOS'
+        if: ${{ runner.os == 'macOS' && env.CKB_CLIENTS_SHOULD_UPLOAD == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Dmg-arm64
           path: release/Neuron-*-arm64.dmg
 
       - name: Upload Neuron Win
-        if: runner.os == 'Windows'
+        if: ${{ runner.os == 'Windows' && env.CKB_CLIENTS_SHOULD_UPLOAD == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Win
           path: release/Neuron-*-setup.exe
 
       - name: Upload Neuron Linux
-        if: runner.os == 'Linux'
+        if: ${{ runner.os == 'Linux' && env.CKB_CLIENTS_SHOULD_UPLOAD == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Linux
@@ -210,6 +283,13 @@ jobs:
           body: |
             Packaging for test is done in [${{ github.run_id }}](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}). @${{ github.event.comment.user.login }}
           edit-mode: append
+
+      - name: Comment by workflow dispatch
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: peter-evans/commit-comment@v3
+        with:
+          body: |
+            Packaging for test (workflow_dispatch) is done in [${{ github.run_id }}](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
 
   comment_when_package_failed:
     needs: [packaging]
