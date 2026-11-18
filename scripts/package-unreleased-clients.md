@@ -8,27 +8,44 @@ Default behavior is unchanged: if you do not fill a branch/ref,
 `scripts/download-ckb.sh` still downloads the official public assets named
 by `.ckb-version` and `.ckb-light-version`.
 
-## Choosing a branch in Actions
+## Choosing a client in Actions
 
-The intended manual UI is **workflow_dispatch** inputs:
+The intended manual UI is **workflow_dispatch** text inputs. CKB and
+ckb-light-client are independent.
 
-- `ckb_repo` / `light_client_repo`: optional `owner/name` text fields.
-  Leave empty for `nervosnetwork/ckb` and `nervosnetwork/ckb-light-client`.
-- `ckb_ref` / `light_client_ref`: the branch, tag, or commit SHA to **build
-  from source**. Filling only a ref (for example `develop`) selects source
-  mode. You do not need a separate source/release switch for this case.
-- Leave both refs empty to keep the official Release path.
-- `upload_packages`: whether to upload Neuron packages as artifacts.
-  Uploads are forced off when a non-official client repo is used.
+Preferred fields:
+
+- `ckb_url` / `light_client_url`: a GitHub URL that selects both the
+  repository and the obtain mode.
+  - Download a Release: `https://github.com/<owner>/<repo>/releases/tag/<tag>`
+  - Build a branch, tag, or SHA from source:
+    `https://github.com/<owner>/<repo>/tree/<ref>`
+  - Official public example (light client `develop` from source):
+    `https://github.com/nervosnetwork/ckb-light-client/tree/develop`
+
+Leave a URL empty to fall back to the matching `*_repo` / `*_ref` fields,
+or to the official Release named by `.ckb-version` / `.ckb-light-version`
+when those are also empty.
+
+Compatibility fields `ckb_repo`, `ckb_ref`, `light_client_repo`, and
+`light_client_ref` still work. Filling only a ref still selects source
+mode. If a URL is provided together with repo, ref, or an explicit source
+mode, the values must match the URL; conflicts are rejected rather than
+silently overridden.
+
+Only `https://github.com/...` URLs are accepted. Userinfo, other hosts,
+`releases/download` asset links, and extra path segments after `/tree/`
+are rejected. If a branch name contains slashes, percent-encode them as
+`%2F` instead of adding extra unencoded path segments. The workflow never
+sends `NEURON_DEP_GITHUB_TOKEN` to a host taken from a user-supplied URL;
+it only calls `api.github.com` and `github.com` using the parsed
+`owner/repo` and ref.
 
 These are ordinary text inputs. GitHub Actions cannot show a live dropdown
-of branches from another repository, so type the branch name yourself.
+of branches from another repository.
 
-If a ref is filled without an explicit source mode, the workflow builds from
-source. That avoids treating `develop` as a Release tag (there is no
-official `develop` Release). Advanced overrides still exist: set
-`CKB_SOURCE` / `CKB_LIGHT_SOURCE` to `release` or `artifact` via a
-`/package` comment if you need those modes.
+`upload_packages` still controls artifact upload and is forced off when a
+non-official client repo is used.
 
 ### When "Run workflow" is available
 
@@ -55,7 +72,7 @@ contains `[skip package]`).
 ## `/package` comment (after default-branch registration)
 
 ```
-/package --light-client-ref develop
+/package --light-client-url https://github.com/nervosnetwork/ckb-light-client/tree/develop
 ```
 
 ```

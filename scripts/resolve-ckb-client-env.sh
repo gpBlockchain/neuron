@@ -21,12 +21,14 @@ apply_input() {
 apply_input CKB_SOURCE "${INPUT_CKB_SOURCE:-}"
 apply_input CKB_REPO "${INPUT_CKB_REPO:-}"
 apply_input CKB_REF "${INPUT_CKB_REF:-}"
+apply_input CKB_URL "${INPUT_CKB_URL:-}"
 apply_input CKB_ARTIFACT_RUN_ID "${INPUT_CKB_ARTIFACT_RUN_ID:-}"
 apply_input CKB_ARTIFACT_NAME "${INPUT_CKB_ARTIFACT_NAME:-}"
 apply_input CKB_ASSET_NAME "${INPUT_CKB_ASSET_NAME:-}"
 apply_input CKB_LIGHT_SOURCE "${INPUT_LIGHT_CLIENT_SOURCE:-}"
 apply_input CKB_LIGHT_REPO "${INPUT_LIGHT_CLIENT_REPO:-}"
 apply_input CKB_LIGHT_REF "${INPUT_LIGHT_CLIENT_REF:-}"
+apply_input CKB_LIGHT_URL "${INPUT_LIGHT_CLIENT_URL:-}"
 apply_input CKB_LIGHT_ARTIFACT_RUN_ID "${INPUT_LIGHT_CLIENT_ARTIFACT_RUN_ID:-}"
 apply_input CKB_LIGHT_ARTIFACT_NAME "${INPUT_LIGHT_CLIENT_ARTIFACT_NAME:-}"
 apply_input CKB_LIGHT_ASSET_NAME "${INPUT_LIGHT_CLIENT_ASSET_NAME:-}"
@@ -39,6 +41,11 @@ if [ -n "${PACKAGE_COMMENT_BODY:-}" ]; then
 $assignments
 EOF
 fi
+
+# GitHub URL inputs (releases/tag => release download, tree => source build)
+# are applied after repo/ref/comment flags. Conflicts are rejected.
+ckb_clients_apply_github_url CKB "${CKB_URL:-}" || exit 1
+ckb_clients_apply_github_url CKB_LIGHT "${CKB_LIGHT_URL:-}" || exit 1
 
 # If the user supplied a branch/tag/SHA and did not set a source mode, build
 # from source. Leaving the ref empty keeps the official Release default.

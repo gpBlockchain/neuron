@@ -5,6 +5,7 @@
 CKB_CLIENTS_OFFICIAL_CKB_REPO="nervosnetwork/ckb"
 CKB_CLIENTS_OFFICIAL_LIGHT_REPO="nervosnetwork/ckb-light-client"
 CKB_CLIENTS_VALID_SOURCES="release source artifact"
+CKB_CLIENTS_LIB_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 ckb_clients_trim() {
   printf '%s' "$1" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
@@ -200,7 +201,7 @@ ckb_clients_parse_package_comment() {
     fi
 
     case "$token" in
-      --ckb-source|--ckb-repo|--ckb-ref|--ckb-artifact-run-id|--ckb-artifact-name|--ckb-asset-name|--light-client-source|--light-client-repo|--light-client-ref|--light-client-artifact-run-id|--light-client-artifact-name|--light-client-asset-name|--upload-packages)
+      --ckb-source|--ckb-repo|--ckb-ref|--ckb-url|--ckb-artifact-run-id|--ckb-artifact-name|--ckb-asset-name|--light-client-source|--light-client-repo|--light-client-ref|--light-client-url|--light-client-artifact-run-id|--light-client-artifact-name|--light-client-asset-name|--upload-packages)
         key="$token"
         next="${rest%% *}"
         if [ -z "$next" ] || [ "$next" = "$rest" ] && [ -z "$rest" ]; then
@@ -245,12 +246,14 @@ ckb_clients_emit_flag() {
     --ckb-source|ckb-source|ckb_source) envname="CKB_SOURCE" ;;
     --ckb-repo|ckb-repo|ckb_repo) envname="CKB_REPO" ;;
     --ckb-ref|ckb-ref|ckb_ref) envname="CKB_REF" ;;
+    --ckb-url|ckb-url|ckb_url) envname="CKB_URL" ;;
     --ckb-artifact-run-id|ckb-artifact-run-id|ckb_artifact_run_id) envname="CKB_ARTIFACT_RUN_ID" ;;
     --ckb-artifact-name|ckb-artifact-name|ckb_artifact_name) envname="CKB_ARTIFACT_NAME" ;;
     --ckb-asset-name|ckb-asset-name|ckb_asset_name) envname="CKB_ASSET_NAME" ;;
     --light-client-source|light-client-source|light_client_source) envname="CKB_LIGHT_SOURCE" ;;
     --light-client-repo|light-client-repo|light_client_repo) envname="CKB_LIGHT_REPO" ;;
     --light-client-ref|light-client-ref|light_client_ref) envname="CKB_LIGHT_REF" ;;
+    --light-client-url|light-client-url|light_client_url) envname="CKB_LIGHT_URL" ;;
     --light-client-artifact-run-id|light-client-artifact-run-id|light_client_artifact_run_id) envname="CKB_LIGHT_ARTIFACT_RUN_ID" ;;
     --light-client-artifact-name|light-client-artifact-name|light_client_artifact_name) envname="CKB_LIGHT_ARTIFACT_NAME" ;;
     --light-client-asset-name|light-client-asset-name|light_client_asset_name) envname="CKB_LIGHT_ASSET_NAME" ;;
@@ -273,6 +276,86 @@ ckb_clients_apply_assignments() {
     value="${line#*=}"
     export "$key=$value"
   done
+}
+
+
+# Parse a GitHub releases/tag or tree URL. Prints MODE=, REPO=, REF= lines.
+ckb_clients_parse_github_url() {
+  python3 "$CKB_CLIENTS_LIB_DIR/parse-github-client-url.py" "$1"
+}
+
+# Apply a parsed URL to CKB_* or CKB_LIGHT_* variables.
+# If repo/ref/source are already set, they must match the URL; conflicts are
+# rejected rather than silently overridden.
+# $1 = CKB | CKB_LIGHT
+# $2 = URL (empty is a no-op)
+ckb_clients_apply_github_url() {
+  local prefix="$1"
+  local url="$2"
+  local parsed line key value
+  local url_mode url_repo url_ref
+  local cur_mode cur_repo cur_ref
+
+  url="$(ckb_clients_trim "$url")"
+  [ -z "$url" ] && return 0
+
+  parsed="$(ckb_clients_parse_github_url "$url")" || return 1
+  url_mode=""
+  url_repo=""
+  url_ref=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="$(ckb_clients_trim "$line")"
+    [ -z "$line" ] && continue
+    key="${line%%=*}"
+    value="${line#*=}"
+    case "$key" in
+      MODE) url_mode="$value" ;;
+      REPO) url_repo="$value" ;;
+      REF) url_ref="$value" ;;
+    esac
+  done <<EOF
+$parsed
+EOF
+
+  if [ -z "$url_mode" ] || [ -z "$url_repo" ] || [ -z "$url_ref" ]; then
+    echo "Failed to parse GitHub URL" >&2
+    return 1
+  fi
+
+  if [ "$prefix" = "CKB_LIGHT" ]; then
+    cur_mode="${CKB_LIGHT_SOURCE:-}"
+    cur_repo="${CKB_LIGHT_REPO:-}"
+    cur_ref="${CKB_LIGHT_REF:-}"
+  else
+    cur_mode="${CKB_SOURCE:-}"
+    cur_repo="${CKB_REPO:-}"
+    cur_ref="${CKB_REF:-}"
+  fi
+
+  if [ -n "$cur_mode" ] && [ "$cur_mode" != "$url_mode" ]; then
+    echo "Conflicting ${prefix} source: existing ${cur_mode} vs URL ${url_mode}" >&2
+    return 1
+  fi
+  if [ -n "$cur_repo" ] && [ "$cur_repo" != "$url_repo" ]; then
+    echo "Conflicting ${prefix} repo: existing value does not match the URL" >&2
+    return 1
+  fi
+  if [ -n "$cur_ref" ] && [ "$cur_ref" != "$url_ref" ]; then
+    echo "Conflicting ${prefix} ref: existing ${cur_ref} vs URL ${url_ref}" >&2
+    return 1
+  fi
+
+  if [ "$prefix" = "CKB_LIGHT" ]; then
+    CKB_LIGHT_SOURCE="$url_mode"
+    CKB_LIGHT_REPO="$url_repo"
+    CKB_LIGHT_REF="$url_ref"
+    export CKB_LIGHT_SOURCE CKB_LIGHT_REPO CKB_LIGHT_REF
+  else
+    CKB_SOURCE="$url_mode"
+    CKB_REPO="$url_repo"
+    CKB_REF="$url_ref"
+    export CKB_SOURCE CKB_REPO CKB_REF
+  fi
 }
 
 ckb_clients_load_defaults() {

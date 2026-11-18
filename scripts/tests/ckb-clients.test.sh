@@ -10,6 +10,15 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 DEFAULT_CKB_REF="$(ckb_clients_read_version_file "$ROOT_DIR/.ckb-version")"
 DEFAULT_LIGHT_REF="$(ckb_clients_read_version_file "$ROOT_DIR/.ckb-light-version")"
 
+parse_url() {
+  ckb_clients_parse_github_url "$1"
+}
+
+url_field() {
+  local key="$1"
+  awk -F= -v k="$key" '$1==k {print substr($0, index($0,"=")+1)}'
+}
+
 FAILS=0
 PASS=0
 
@@ -196,9 +205,10 @@ run_resolve() {
       -u CKB_REF -u CKB_LIGHT_REF -u CKB_ARTIFACT_RUN_ID -u CKB_ARTIFACT_NAME \
       -u CKB_LIGHT_ARTIFACT_RUN_ID -u CKB_LIGHT_ARTIFACT_NAME -u CKB_ASSET_NAME \
       -u CKB_LIGHT_ASSET_NAME -u UPLOAD_PACKAGES -u PACKAGE_COMMENT_BODY \
-      -u INPUT_CKB_SOURCE -u INPUT_CKB_REPO -u INPUT_CKB_REF \
+      -u CKB_URL -u CKB_LIGHT_URL \
+      -u INPUT_CKB_SOURCE -u INPUT_CKB_REPO -u INPUT_CKB_REF -u INPUT_CKB_URL \
       -u INPUT_CKB_ARTIFACT_RUN_ID -u INPUT_CKB_ARTIFACT_NAME -u INPUT_CKB_ASSET_NAME \
-      -u INPUT_LIGHT_CLIENT_SOURCE -u INPUT_LIGHT_CLIENT_REPO -u INPUT_LIGHT_CLIENT_REF \
+      -u INPUT_LIGHT_CLIENT_SOURCE -u INPUT_LIGHT_CLIENT_REPO -u INPUT_LIGHT_CLIENT_REF -u INPUT_LIGHT_CLIENT_URL \
       -u INPUT_LIGHT_CLIENT_ARTIFACT_RUN_ID -u INPUT_LIGHT_CLIENT_ARTIFACT_NAME \
       -u INPUT_LIGHT_CLIENT_ASSET_NAME -u INPUT_UPLOAD_PACKAGES \
       "$@" bash "$ROOT_DIR/scripts/resolve-ckb-client-env.sh"
@@ -254,6 +264,108 @@ else
   echo "ok - sensitive plan does not print the non-official repo name"
 fi
 
+# --- GitHub URL parsing (generic placeholders only) ---
+parsed="$(parse_url 'https://github.com/example/private-ckb/releases/tag/v1.2.3-rc1')"
+assert_eq "releases/tag URL mode is release" "release" "$(printf '%s\n' "$parsed" | url_field MODE)"
+assert_eq "releases/tag URL repo" "example/private-ckb" "$(printf '%s\n' "$parsed" | url_field REPO)"
+assert_eq "releases/tag URL ref" "v1.2.3-rc1" "$(printf '%s\n' "$parsed" | url_field REF)"
+
+parsed="$(parse_url 'https://github.com/example/private-ckb/tree/v1.2.3-rc1')"
+assert_eq "tree URL mode is source" "source" "$(printf '%s\n' "$parsed" | url_field MODE)"
+assert_eq "tree URL repo" "example/private-ckb" "$(printf '%s\n' "$parsed" | url_field REPO)"
+assert_eq "tree URL ref" "v1.2.3-rc1" "$(printf '%s\n' "$parsed" | url_field REF)"
+
+parsed="$(parse_url 'https://github.com/nervosnetwork/ckb-light-client/tree/develop')"
+assert_eq "official light-client develop tree mode" "source" "$(printf '%s\n' "$parsed" | url_field MODE)"
+assert_eq "official light-client develop tree repo" "nervosnetwork/ckb-light-client" "$(printf '%s\n' "$parsed" | url_field REPO)"
+assert_eq "official light-client develop tree ref" "develop" "$(printf '%s\n' "$parsed" | url_field REF)"
+
+parsed="$(parse_url 'https://github.com/example/private-ckb/tree/feature%2Ffoo')"
+assert_eq "percent-encoded slash in tree ref" "feature/foo" "$(printf '%s\n' "$parsed" | url_field REF)"
+parsed="$(parse_url 'https://github.com/example/private-ckb/releases/tag/rc%2F1.2')"
+assert_eq "percent-encoded slash in release tag" "rc/1.2" "$(printf '%s\n' "$parsed" | url_field REF)"
+
+parsed="$(parse_url 'https://github.com/example/private-ckb/tree/develop/')"
+assert_eq "trailing slash on tree URL is accepted" "develop" "$(printf '%s\n' "$parsed" | url_field REF)"
+
+assert_fail "unencoded path after tree is rejected" parse_url 'https://github.com/example/private-ckb/tree/develop/src'
+assert_fail "userinfo in URL is rejected" parse_url 'https://user:token@github.com/example/private-ckb/tree/develop'
+assert_fail "http URL is rejected" parse_url 'http://github.com/example/private-ckb/tree/develop'
+assert_fail "unexpected host is rejected" parse_url 'https://evil.example/example/private-ckb/tree/develop'
+assert_fail "github lookalike host is rejected" parse_url 'https://github.com.evil.example/example/private-ckb/tree/develop'
+assert_fail "gist.github.com is rejected" parse_url 'https://gist.github.com/example/private-ckb/tree/develop'
+assert_fail "raw.githubusercontent.com is rejected" parse_url 'https://raw.githubusercontent.com/example/private-ckb/tree/develop'
+assert_fail "api.github.com input is rejected" parse_url 'https://api.github.com/repos/example/private-ckb/releases/tags/v1'
+assert_fail "blob URL is rejected" parse_url 'https://github.com/example/private-ckb/blob/develop/README.md'
+assert_fail "releases/download URL is rejected" parse_url 'https://github.com/example/private-ckb/releases/download/v1.2.3-rc1/asset.tar.gz'
+
+# Parser errors must not echo a token from userinfo.
+if parse_url 'https://user:supersecret@github.com/example/private-ckb/tree/develop' 2>/tmp/ckb-url-userinfo.err >/tmp/ckb-url-userinfo.out; then
+  FAILS=$((FAILS + 1))
+  echo "not ok - userinfo URL should fail"
+else
+  PASS=$((PASS + 1))
+  echo "ok - userinfo URL fails closed"
+fi
+if grep -E 'supersecret|user:|@github.com' /tmp/ckb-url-userinfo.err /tmp/ckb-url-userinfo.out >/dev/null; then
+  FAILS=$((FAILS + 1))
+  echo "not ok - rejected URL stderr/stdout must not echo userinfo or token"
+else
+  PASS=$((PASS + 1))
+  echo "ok - rejected URL output does not echo userinfo or token"
+fi
+
+# Resolve: URL selects mode independently for each client.
+resolved="$(run_resolve INPUT_LIGHT_CLIENT_URL='https://github.com/nervosnetwork/ckb-light-client/tree/develop' 2>/dev/null)"
+assert_eq "light tree URL selects source" "source" "$(printf '%s\n' "$resolved" | awk -F= '/^CKB_LIGHT_SOURCE=/{print $2}')"
+assert_eq "light tree URL keeps develop" "develop" "$(printf '%s\n' "$resolved" | awk -F= '/^CKB_LIGHT_REF=/{print $2}')"
+assert_eq "light tree URL leaves official ckb on release" "release" "$(printf '%s\n' "$resolved" | awk -F= '/^CKB_SOURCE=/{print $2}')"
+assert_eq "official light tree may still upload" "true" "$(printf '%s\n' "$resolved" | awk -F= '/^CKB_CLIENTS_SHOULD_UPLOAD=/{print $2}')"
+
+resolved="$(run_resolve INPUT_CKB_URL='https://github.com/example/private-ckb/releases/tag/v1.2.3-rc1' 2>/tmp/ckb-url-release.err)"
+assert_eq "ckb releases/tag URL selects release" "release" "$(printf '%s\n' "$resolved" | awk -F= '/^CKB_SOURCE=/{print $2}')"
+assert_eq "ckb releases/tag URL ref" "v1.2.3-rc1" "$(printf '%s\n' "$resolved" | awk -F= '/^CKB_REF=/{print $2}')"
+assert_eq "ckb releases/tag private repo is sensitive" "true" "$(printf '%s\n' "$resolved" | awk -F= '/^CKB_CLIENTS_SENSITIVE=/{print $2}')"
+assert_eq "ckb releases/tag private repo must not upload" "false" "$(printf '%s\n' "$resolved" | awk -F= '/^CKB_CLIENTS_SHOULD_UPLOAD=/{print $2}')"
+
+resolved="$(run_resolve INPUT_CKB_URL='https://github.com/example/private-ckb/tree/v1.2.3-rc1' INPUT_LIGHT_CLIENT_URL='https://github.com/nervosnetwork/ckb-light-client/tree/develop' 2>/dev/null)"
+assert_eq "independent ckb tree URL is source" "source" "$(printf '%s\n' "$resolved" | awk -F= '/^CKB_SOURCE=/{print $2}')"
+assert_eq "independent light tree URL is source" "source" "$(printf '%s\n' "$resolved" | awk -F= '/^CKB_LIGHT_SOURCE=/{print $2}')"
+assert_eq "mixed official and private is sensitive" "true" "$(printf '%s\n' "$resolved" | awk -F= '/^CKB_CLIENTS_SENSITIVE=/{print $2}')"
+
+# Compatible repo/ref alongside the same URL is allowed.
+resolved="$(run_resolve INPUT_CKB_URL='https://github.com/example/private-ckb/tree/v1.2.3-rc1' INPUT_CKB_REPO='example/private-ckb' INPUT_CKB_REF='v1.2.3-rc1' INPUT_CKB_SOURCE='source' 2>/dev/null)"
+assert_eq "matching repo/ref/source with URL is accepted" "source" "$(printf '%s\n' "$resolved" | awk -F= '/^CKB_SOURCE=/{print $2}')"
+
+# Conflicts are rejected, not silently overridden.
+if run_resolve INPUT_CKB_URL='https://github.com/example/private-ckb/tree/v1.2.3-rc1' INPUT_CKB_REF='develop' >/tmp/ckb-url-conflict-ref.out 2>/tmp/ckb-url-conflict-ref.err; then
+  FAILS=$((FAILS + 1))
+  echo "not ok - URL vs different ref should fail"
+else
+  PASS=$((PASS + 1))
+  echo "ok - URL vs different ref is rejected"
+fi
+if run_resolve INPUT_CKB_URL='https://github.com/example/private-ckb/tree/v1.2.3-rc1' INPUT_CKB_SOURCE='release' >/tmp/ckb-url-conflict-mode.out 2>/tmp/ckb-url-conflict-mode.err; then
+  FAILS=$((FAILS + 1))
+  echo "not ok - tree URL vs release mode should fail"
+else
+  PASS=$((PASS + 1))
+  echo "ok - tree URL vs release mode is rejected"
+fi
+if run_resolve INPUT_CKB_URL='https://github.com/example/private-ckb/releases/tag/v1.2.3-rc1' INPUT_CKB_REPO='example/other-ckb' >/tmp/ckb-url-conflict-repo.out 2>/tmp/ckb-url-conflict-repo.err; then
+  FAILS=$((FAILS + 1))
+  echo "not ok - URL vs different repo should fail"
+else
+  PASS=$((PASS + 1))
+  echo "ok - URL vs different repo is rejected"
+fi
+
+# Comment --ckb-url uses the same parser.
+parsed="$(ckb_clients_parse_package_comment '/package --ckb-url https://github.com/example/private-ckb/releases/tag/v1.2.3-rc1')"
+assert_eq "comment parse ckb url" "https://github.com/example/private-ckb/releases/tag/v1.2.3-rc1" "$(printf '%s\n' "$parsed" | awk -F= '/^CKB_URL=/{print substr($0, index($0,"=")+1)}')"
+resolved="$(run_resolve PACKAGE_COMMENT_BODY='/package --light-client-url https://github.com/nervosnetwork/ckb-light-client/tree/develop' 2>/dev/null)"
+assert_eq "comment light tree URL selects source" "source" "$(printf '%s\n' "$resolved" | awk -F= '/^CKB_LIGHT_SOURCE=/{print $2}')"
+
 # --- manifest ---
 export CKB_SOURCE=release CKB_REPO=nervosnetwork/ckb CKB_REF=v0.209.0 CKB_RESOLVED_SHA=deadbeef
 export CKB_LIGHT_SOURCE=source CKB_LIGHT_REPO=nervosnetwork/ckb-light-client CKB_LIGHT_REF=develop
@@ -304,7 +416,7 @@ on = data.get(True) or data.get("on")
 inputs = on["workflow_dispatch"]["inputs"]
 if len(inputs) > 25:
     raise SystemExit(f"too many inputs: {len(inputs)}")
-for key in ("ckb_ref", "light_client_ref", "ckb_repo", "light_client_repo"):
+for key in ("ckb_url", "light_client_url", "ckb_ref", "light_client_ref", "ckb_repo", "light_client_repo"):
     typ = inputs[key].get("type", "string")
     if typ != "string" or "options" in inputs[key]:
         raise SystemExit(f"{key} must be a free-text field, got {inputs[key]}")
