@@ -104,6 +104,7 @@ jobs:
             }
 
       - name: Resolve client sources
+        shell: bash
         env:
           PACKAGE_COMMENT_BODY: ${{ github.event.comment.body || '' }}
           INPUT_CKB_SOURCE: ${{ inputs.ckb_source || '' }}
@@ -124,6 +125,7 @@ jobs:
         run: bash scripts/resolve-ckb-client-env.sh >> "$GITHUB_ENV"
 
       - name: Record upload decision
+        shell: bash
         id: upload_decision
         run: |
           echo "should_upload=${CKB_CLIENTS_SHOULD_UPLOAD}" >> "$GITHUB_OUTPUT"
