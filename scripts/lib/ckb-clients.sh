@@ -602,8 +602,14 @@ manifest = {
   "sensitive": os.environ.get("CKB_CLIENTS_SENSITIVE", "false") == "true",
   "uploaded_packages": os.environ.get("CKB_CLIENTS_SHOULD_UPLOAD", "false") == "true",
 }
-# If sources are sensitive, still record origin locally for the operator,
-# but callers must not upload this file from a public repository.
+# A separately authorized installer contains the private binary, but must
+# not disclose non-public provenance through its bundled manifest.
+if manifest["sensitive"] and os.environ.get("CKB_TEST_PRIVATE_INSTALLER_UPLOAD") == "true":
+    for client in (manifest["ckb"], manifest["ckb_light_client"]):
+        if client["repo"] not in {"nervosnetwork/ckb", "nervosnetwork/ckb-light-client"}:
+            for field in ("repo", "ref", "resolved_sha", "asset"):
+                client[field] = ""
+    manifest["uploaded_packages"] = True
 os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
 with open(dest, "w", encoding="utf-8") as f:
     json.dump(manifest, f, indent=2)
@@ -615,7 +621,7 @@ ckb_clients_log_plan() {
   # Safe summary: never print tokens. For non-official repos, avoid echoing the exact repo
   # in case this is running on a public Actions log.
   if [ "${CKB_CLIENTS_SENSITIVE:-false}" = "true" ]; then
-    echo "Client sources include a non-official repository; package upload will be skipped."
+    echo "Client sources include a non-official repository; package upload is disabled by default."
     echo "CKB mode=${CKB_SOURCE} ref=${CKB_REF}"
     echo "Light client mode=${CKB_LIGHT_SOURCE} ref=${CKB_LIGHT_REF}"
   else

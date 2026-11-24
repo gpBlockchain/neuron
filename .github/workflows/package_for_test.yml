@@ -28,9 +28,13 @@ on:
         type: string
         default: ""
       upload_packages:
-        description: "Upload packaged apps as artifacts. Forced off when a non-official client repo is used."
+        description: "Upload installers as artifacts. Required for sync jobs; non-official clients also require the separate opt-in."
         type: boolean
         default: true
+      upload_private_packages:
+        description: "Allow signed-in GitHub readers to download the specified private CKB rc3 in Windows/Linux test installers for 1 day."
+        type: boolean
+        default: false
 
   issue_comment:
     types: [created]
@@ -49,6 +53,11 @@ jobs:
           - windows-2022
 
     runs-on: ${{ matrix.os }}
+    outputs:
+      # Every matrix leg resolves the same event inputs. This is the shared
+      # policy for Windows/Linux sync installers, not a macOS upload decision.
+      sync_installers: ${{ steps.upload_decision.outputs.sync_installers }}
+      sensitive: ${{ steps.upload_decision.outputs.sensitive }}
 
     permissions:
       contents: read
@@ -127,11 +136,37 @@ jobs:
       - name: Record upload decision
         shell: bash
         id: upload_decision
+        env:
+          PRIVATE_UPLOAD_OPT_IN: ${{ github.event_name == 'workflow_dispatch' && github.repository == 'gpBlockchain/neuron' && github.ref == 'refs/heads/wasm' && inputs.upload_private_packages == true && 'true' || 'false' }}
         run: |
-          echo "should_upload=${CKB_CLIENTS_SHOULD_UPLOAD}" >> "$GITHUB_OUTPUT"
-          echo "sensitive=${CKB_CLIENTS_SENSITIVE}" >> "$GITHUB_OUTPUT"
-          if [ "${CKB_CLIENTS_SHOULD_UPLOAD}" != "true" ]; then
-            echo "Neuron package artifacts will not be uploaded from this public workflow run."
+          sync_installers=false
+          private_retention=0
+          sensitive="${CKB_CLIENTS_SENSITIVE:-unknown}"
+          if [ "${CKB_CLIENTS_SHOULD_UPLOAD:-false}" = true ] && [ "$sensitive" = false ]; then
+            sync_installers=true
+          elif [ "$PRIVATE_UPLOAD_OPT_IN" = true ] && [ "${UPLOAD_PACKAGES:-false}" = true ]; then
+            if [ "$sensitive" != true ] ||
+               [ "$CKB_REPO" != nervosnetwork/ckb-private ] ||
+               [ "$CKB_SOURCE" != release ] ||
+               [ "$CKB_REF" != v0.211.0-rc3 ] ||
+               [ "$CKB_LIGHT_REPO" != nervosnetwork/ckb-light-client ] ||
+               [ "$CKB_LIGHT_SOURCE" != source ] ||
+               [ "$CKB_LIGHT_REF" != develop ]; then
+              echo "::error::Private installer upload is limited to the approved CKB rc3 + public light-client develop inputs."
+              exit 1
+            fi
+            sync_installers=true
+            private_retention=1
+          fi
+          {
+            echo "sync_installers=$sync_installers"
+            echo "sensitive=$sensitive"
+            echo "installer_retention_days=$private_retention"
+          } >> "$GITHUB_OUTPUT"
+          if [ "$sync_installers" = false ]; then
+            echo "No Windows/Linux installers will be uploaded; package-based sync tests will not run." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$private_retention" = 1 ]; then
+            echo "Windows/Linux test installers will be shared as GitHub Actions artifacts for one day." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Setup Rust
@@ -201,21 +236,38 @@ jobs:
 
       - name: Package for Windows
         if: runner.os == 'Windows'
+        shell: bash
         run: |
+          if [ "$CKB_CLIENTS_SENSITIVE" = true ]; then
+            exec 3>&1
+            umask 077
+            log_dir="$(cygpath -u "$RUNNER_TEMP")"
+            exec > "$log_dir/neuron-private-package.log" 2>&1
+            trap 'if [ "$?" -ne 0 ]; then echo "::error::Packaging failed; private build logs were not shared." >&3; fi' EXIT
+          fi
           bash ./scripts/download-ckb.sh win
           yarn build
           bash ./scripts/copy-ui-files.sh
           bash ./scripts/package-for-test.sh win
         env:
+          CKB_TEST_PRIVATE_INSTALLER_UPLOAD: ${{ steps.upload_decision.outputs.installer_retention_days == '1' && 'true' || 'false' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CKB_CLIENT_TOKEN: ${{ secrets.NEURON_DEP_GITHUB_TOKEN }}
 
       - name: Package for Linux
         if: runner.os == 'Linux'
+        shell: bash
         run: |
+          if [ "$CKB_CLIENTS_SENSITIVE" = true ]; then
+            exec 3>&1
+            umask 077
+            exec > "$RUNNER_TEMP/neuron-private-package.log" 2>&1
+            trap 'if [ "$?" -ne 0 ]; then echo "::error::Packaging failed; private build logs were not shared." >&3; fi' EXIT
+          fi
           ./scripts/download-ckb.sh
           yarn package:test linux
         env:
+          CKB_TEST_PRIVATE_INSTALLER_UPLOAD: ${{ steps.upload_decision.outputs.installer_retention_days == '1' && 'true' || 'false' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CKB_CLIENT_TOKEN: ${{ secrets.NEURON_DEP_GITHUB_TOKEN }}
           USE_HARD_LINKS: false
@@ -249,18 +301,22 @@ jobs:
           path: release/Neuron-*-arm64.dmg
 
       - name: Upload Neuron Win
-        if: ${{ runner.os == 'Windows' && env.CKB_CLIENTS_SHOULD_UPLOAD == 'true' }}
+        if: ${{ runner.os == 'Windows' && steps.upload_decision.outputs.sync_installers == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Win
           path: release/Neuron-*-setup.exe
+          if-no-files-found: error
+          retention-days: ${{ steps.upload_decision.outputs.installer_retention_days }}
 
       - name: Upload Neuron Linux
-        if: ${{ runner.os == 'Linux' && env.CKB_CLIENTS_SHOULD_UPLOAD == 'true' }}
+        if: ${{ runner.os == 'Linux' && steps.upload_decision.outputs.sync_installers == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: Neuron-Linux
           path: release/Neuron-*.AppImage
+          if-no-files-found: error
+          retention-days: ${{ steps.upload_decision.outputs.installer_retention_days }}
 
   comment_when_package_success:
     needs: [packaging]
@@ -287,7 +343,7 @@ jobs:
           edit-mode: append
 
       - name: Comment by workflow dispatch
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && needs.packaging.outputs.sensitive == 'false' }}
         uses: peter-evans/commit-comment@v3
         with:
           body: |
@@ -310,7 +366,7 @@ jobs:
           edit-mode: append
 
   sync-test:
-    if: ${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package -test')) || github.event_name == 'push' }}
+    if: ${{ needs.packaging.outputs.sync_installers == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package -test'))) }}
     needs: [packaging]
     strategy:
       matrix:
@@ -322,11 +378,16 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
-    name: ${{ matrix.os }}(Node.js ${{ matrix.node }})
+    name: Native sync (${{ matrix.os }})
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/merge', github.event.issue.number) || github.sha }}
+          persist-credentials: false
 
 
       - name: Install libudev
@@ -366,29 +427,47 @@ jobs:
         if: matrix.os == 'windows-2022'
         run: |
           cd packages\sync-test
-          yarn
-          .\scripts\prepare_neuron_windows.bat
-          yarn sync-test
+          function Run-SyncStep($action) {
+            if ($env:PRIVATE_SYNC -eq 'true') {
+              & $action *>> "$env:RUNNER_TEMP/neuron-private-sync.log"
+            } else {
+              & $action
+            }
+            if ($LASTEXITCODE -ne 0) { throw 'Neuron native sync step failed.' }
+          }
+          Run-SyncStep { yarn }
+          Run-SyncStep { .\scripts\prepare_neuron_windows.bat }
+          Run-SyncStep { yarn sync-test }
+        env:
+          PRIVATE_SYNC: ${{ needs.packaging.outputs.sensitive }}
       - name: ubuntu run
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          cd  packages/sync-test
+          if [ "$PRIVATE_SYNC" = true ]; then
+            exec 3>&1
+            umask 077
+            exec > "$RUNNER_TEMP/neuron-private-sync.log" 2>&1
+            trap 'if [ "$?" -ne 0 ]; then echo "::error::Neuron sync failed; private test logs were not shared." >&3; fi' EXIT
+          fi
+          cd packages/sync-test
           yarn
           bash scripts/prepare_neuron_linux.sh
           xvfb-run --auto-servernum yarn sync-test
+        env:
+          PRIVATE_SYNC: ${{ needs.packaging.outputs.sensitive }}
       - name: tar result
-        if: ${{ failure() || cancelled() }}
+        if: ${{ (failure() || cancelled()) && needs.packaging.outputs.sensitive == 'false' }}
         run: |
           tar -zcvf tmp.${{ matrix.os  }}.tar.gz packages/sync-test/tmp
       - name: Publish reports
-        if: ${{ failure() || cancelled() }}
+        if: ${{ (failure() || cancelled()) && needs.packaging.outputs.sensitive == 'false' }}
         uses: actions/upload-artifact@v4
         with:
           name: jfoa-build-reports-${{ runner.os }}
           path: tmp.${{ matrix.os  }}.tar.gz
 
   sync-wasm-test:
-    if: ${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package -test')) || github.event_name == 'push' }}
+    if: ${{ needs.packaging.outputs.sync_installers == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package -test'))) }}
     needs: [packaging]
     strategy:
       matrix:
@@ -399,11 +478,16 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
-    name: ${{ matrix.os }}(Node.js ${{ matrix.node }})
+    name: WASM sync (${{ matrix.os }})
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/merge', github.event.issue.number) || github.sha }}
+          persist-credentials: false
 
 
       - name: Install libudev
@@ -426,7 +510,13 @@ jobs:
       - name: ubuntu run
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          cd  packages/sync-test
+          if [ "$PRIVATE_SYNC" = true ]; then
+            exec 3>&1
+            umask 077
+            exec > "$RUNNER_TEMP/neuron-private-sync.log" 2>&1
+            trap 'if [ "$?" -ne 0 ]; then echo "::error::Neuron sync failed; private test logs were not shared." >&3; fi' EXIT
+          fi
+          cd packages/sync-test
           yarn
           bash scripts/prepare_neuron_linux.sh
           git clone https://github.com/gpBlockchain/ckb-light-wasm-demo.git
@@ -436,12 +526,14 @@ jobs:
           bash build.sh
           cd ../
           xvfb-run --auto-servernum yarn sync-wasm-test
+        env:
+          PRIVATE_SYNC: ${{ needs.packaging.outputs.sensitive }}
       - name: tar result
-        if: ${{ failure() || cancelled() }}
+        if: ${{ (failure() || cancelled()) && needs.packaging.outputs.sensitive == 'false' }}
         run: |
           tar -zcvf tmp.${{ matrix.os  }}.tar.gz packages/sync-test/tmp
       - name: Publish reports
-        if: ${{ failure() || cancelled() }}
+        if: ${{ (failure() || cancelled()) && needs.packaging.outputs.sensitive == 'false' }}
         uses: actions/upload-artifact@v4
         with:
           name: jfoa-build-reports-wasm-${{ runner.os }}
