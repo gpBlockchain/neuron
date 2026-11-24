@@ -246,8 +246,26 @@ jobs:
             exec > "$log_dir/neuron-private-package.log" 2>&1
             trap 'rc=$?; if [ "$rc" -ne 0 ]; then echo "::error::Windows packaging failed during ${phase:-setup} (exit $rc); private build logs were not shared." >&3; fi' EXIT
           fi
+          if [ "$CKB_SOURCE" = source ] || [ "$CKB_LIGHT_SOURCE" = source ]; then
+            phase="native Perl preflight"
+            # The MSYS Perl bundled with Git lacks modules needed by vendored
+            # OpenSSL. Select the Windows runner's native Strawberry Perl.
+            perl_path="/c/Strawberry/perl/bin/perl.exe"
+            test -x "$perl_path"
+            "$perl_path" -MLocale::Maketext::Simple -MIPC::Cmd -e 'exit($^O eq "MSWin32" ? 0 : 1)'
+            export OPENSSL_SRC_PERL="$(cygpath -w "$perl_path")"
+            export PERL="$OPENSSL_SRC_PERL"
+          fi
           phase="client-dependency preparation"
+          client_dir=packages/neuron-wallet/bin/win
+          rm -f "$client_dir/ckb.exe" "$client_dir/ckb-light-client.exe"
           bash ./scripts/download-ckb.sh win
+          phase="client binary verification"
+          for client in ckb ckb-light-client; do
+            test -s "$client_dir/$client.exe"
+            version="$("$client_dir/$client.exe" --version)"
+            test -n "$version"
+          done
           phase="Neuron build"
           yarn build
           phase="UI staging"
