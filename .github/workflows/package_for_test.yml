@@ -45,6 +45,7 @@ jobs:
     if: ${{ ((github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package') && contains(fromJSON('["OWNER", "COLLABORATOR"]'), github.event.comment.author_association)) || github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip package]')) }}
 
     strategy:
+      fail-fast: false
       matrix:
         node: [22]
         os:
@@ -54,9 +55,9 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     outputs:
-      # Every matrix leg resolves the same event inputs. This is the shared
-      # policy for Windows/Linux sync installers, not a macOS upload decision.
-      sync_installers: ${{ steps.upload_decision.outputs.sync_installers }}
+      # Each non-empty artifact ID comes from exactly one matrix leg.
+      linux_artifact_id: ${{ steps.upload_linux.outputs.artifact-id }}
+      windows_artifact_id: ${{ steps.upload_windows.outputs.artifact-id }}
       sensitive: ${{ steps.upload_decision.outputs.sensitive }}
 
     permissions:
@@ -243,11 +244,15 @@ jobs:
             umask 077
             log_dir="$(cygpath -u "$RUNNER_TEMP")"
             exec > "$log_dir/neuron-private-package.log" 2>&1
-            trap 'if [ "$?" -ne 0 ]; then echo "::error::Packaging failed; private build logs were not shared." >&3; fi' EXIT
+            trap 'rc=$?; if [ "$rc" -ne 0 ]; then echo "::error::Windows packaging failed during ${phase:-setup} (exit $rc); private build logs were not shared." >&3; fi' EXIT
           fi
+          phase="client-dependency preparation"
           bash ./scripts/download-ckb.sh win
+          phase="Neuron build"
           yarn build
+          phase="UI staging"
           bash ./scripts/copy-ui-files.sh
+          phase="installer generation"
           bash ./scripts/package-for-test.sh win
         env:
           CKB_TEST_PRIVATE_INSTALLER_UPLOAD: ${{ steps.upload_decision.outputs.installer_retention_days == '1' && 'true' || 'false' }}
@@ -301,6 +306,7 @@ jobs:
           path: release/Neuron-*-arm64.dmg
 
       - name: Upload Neuron Win
+        id: upload_windows
         if: ${{ runner.os == 'Windows' && steps.upload_decision.outputs.sync_installers == 'true' }}
         uses: actions/upload-artifact@v4
         with:
@@ -310,6 +316,7 @@ jobs:
           retention-days: ${{ steps.upload_decision.outputs.installer_retention_days }}
 
       - name: Upload Neuron Linux
+        id: upload_linux
         if: ${{ runner.os == 'Linux' && steps.upload_decision.outputs.sync_installers == 'true' }}
         uses: actions/upload-artifact@v4
         with:
@@ -366,82 +373,28 @@ jobs:
           edit-mode: append
 
   sync-test:
-    if: ${{ needs.packaging.outputs.sync_installers == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package -test'))) }}
+    if: ${{ !cancelled() && needs.packaging.outputs.linux_artifact_id != '' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package -test'))) }}
     needs: [packaging]
-    strategy:
-      matrix:
-        node:
-          - 20.19.0
-        os:
-          - ubuntu-22.04
-          - windows-2022
-
-    runs-on: ${{ matrix.os }}
-
-    name: Native sync (${{ matrix.os }})
+    runs-on: ubuntu-22.04
+    name: Native sync (ubuntu-22.04)
     permissions:
       contents: read
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/merge', github.event.issue.number) || github.sha }}
           persist-credentials: false
-
-
       - name: Install libudev
-        if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libudev-dev libusb-1.0-0-dev
-      - name: Download Neuron App Zip(x64)
-        if: matrix.os == 'macos-latest'
-        uses: actions/download-artifact@v4
-        with:
-          name: Neuron-Mac-x64
-          path: packages/sync-test
-
-      - name: Download Neuron Win
-        if: matrix.os == 'windows-2022'
-        uses: actions/download-artifact@v4
-        with:
-          name: Neuron-Win
-          path: packages/sync-test
-
       - name: Download Neuron Linux
-        if: matrix.os == 'ubuntu-22.04'
         uses: actions/download-artifact@v4
         with:
           name: Neuron-Linux
           path: packages/sync-test
-
-      - name: macos run
-        if: matrix.os == 'macos-latest'
-        run: |
-          cd packages/sync-test
-          yarn
-          bash scripts/prepare_neuron_macos.sh
-          yarn sync-test
-      - name:  Windows run
-        if: matrix.os == 'windows-2022'
-        run: |
-          cd packages\sync-test
-          function Run-SyncStep($action) {
-            if ($env:PRIVATE_SYNC -eq 'true') {
-              & $action *>> "$env:RUNNER_TEMP/neuron-private-sync.log"
-            } else {
-              & $action
-            }
-            if ($LASTEXITCODE -ne 0) { throw 'Neuron native sync step failed.' }
-          }
-          Run-SyncStep { yarn }
-          Run-SyncStep { .\scripts\prepare_neuron_windows.bat }
-          Run-SyncStep { yarn sync-test }
-        env:
-          PRIVATE_SYNC: ${{ needs.packaging.outputs.sensitive }}
       - name: ubuntu run
-        if: matrix.os == 'ubuntu-22.04'
         run: |
           if [ "$PRIVATE_SYNC" = true ]; then
             exec 3>&1
@@ -458,16 +411,61 @@ jobs:
       - name: tar result
         if: ${{ (failure() || cancelled()) && needs.packaging.outputs.sensitive == 'false' }}
         run: |
-          tar -zcvf tmp.${{ matrix.os  }}.tar.gz packages/sync-test/tmp
+          tar -zcvf tmp.ubuntu-22.04.tar.gz packages/sync-test/tmp
       - name: Publish reports
         if: ${{ (failure() || cancelled()) && needs.packaging.outputs.sensitive == 'false' }}
         uses: actions/upload-artifact@v4
         with:
           name: jfoa-build-reports-${{ runner.os }}
-          path: tmp.${{ matrix.os  }}.tar.gz
+          path: tmp.ubuntu-22.04.tar.gz
+
+  sync-test-windows:
+    if: ${{ !cancelled() && needs.packaging.outputs.windows_artifact_id != '' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package -test'))) }}
+    needs: [packaging]
+    runs-on: windows-2022
+    name: Native sync (windows-2022)
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/merge', github.event.issue.number) || github.sha }}
+          persist-credentials: false
+      - name: Download Neuron Win
+        uses: actions/download-artifact@v4
+        with:
+          name: Neuron-Win
+          path: packages/sync-test
+      - name:  Windows run
+        run: |
+          cd packages\sync-test
+          function Run-SyncStep($action) {
+            if ($env:PRIVATE_SYNC -eq 'true') {
+              & $action *>> "$env:RUNNER_TEMP/neuron-private-sync.log"
+            } else {
+              & $action
+            }
+            if ($LASTEXITCODE -ne 0) { throw 'Neuron native sync step failed.' }
+          }
+          Run-SyncStep { yarn }
+          Run-SyncStep { .\scripts\prepare_neuron_windows.bat }
+          Run-SyncStep { yarn sync-test }
+        env:
+          PRIVATE_SYNC: ${{ needs.packaging.outputs.sensitive }}
+      - name: tar result
+        if: ${{ (failure() || cancelled()) && needs.packaging.outputs.sensitive == 'false' }}
+        run: |
+          tar -zcvf tmp.windows-2022.tar.gz packages/sync-test/tmp
+      - name: Publish reports
+        if: ${{ (failure() || cancelled()) && needs.packaging.outputs.sensitive == 'false' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: jfoa-build-reports-${{ runner.os }}
+          path: tmp.windows-2022.tar.gz
 
   sync-wasm-test:
-    if: ${{ needs.packaging.outputs.sync_installers == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package -test'))) }}
+    if: ${{ !cancelled() && needs.packaging.outputs.linux_artifact_id != '' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/package -test'))) }}
     needs: [packaging]
     strategy:
       matrix:
