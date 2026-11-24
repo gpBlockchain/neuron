@@ -518,35 +518,33 @@ ckb_clients_clone_ref() {
   repo="$(ckb_clients_trim "$1")"
   ref="$(ckb_clients_trim "$2")"
   dest="$(ckb_clients_trim "$3")"
-  local token xtrace_was_on=0
-  token="$(ckb_clients_token)"
+  local token xtrace_was_on=0 st=0
+  local -a clone_git=(git)
   rm -rf "$dest"
   mkdir -p "$(dirname "$dest")"
   case "$-" in *x*) xtrace_was_on=1; set +x ;; esac
-  if [ -n "$token" ]; then
-    # extraheader keeps the token out of the remote URL and git logs.
-    git -c "http.extraheader=AUTHORIZATION: bearer $token" clone --depth 1 --branch "$ref" "https://github.com/${repo}.git" "$dest"
-    local st=$?
-    if [ $st -ne 0 ]; then
-      # Some SHAs cannot be used with --branch; fetch the commit instead.
-      git -c "http.extraheader=AUTHORIZATION: bearer $token" clone --depth 1 "https://github.com/${repo}.git" "$dest" \
-        && git -C "$dest" -c "http.extraheader=AUTHORIZATION: bearer $token" fetch --depth 1 origin "$ref" \
-        && git -C "$dest" checkout FETCH_HEAD
-      st=$?
+  if ckb_clients_is_official_repo "$(printf '%s' "$repo" | tr '[:upper:]' '[:lower:]')"; then
+    # A token scoped to a private dependency cannot authenticate public clones.
+    # Ignore ambient GitHub auth headers and credential helpers for these repos.
+    clone_git=(env GIT_TERMINAL_PROMPT=0 git -c credential.helper= -c http.extraheader= -c http.https://github.com/.extraheader=)
+  else
+    token="$(ckb_clients_token)"
+    if [ -n "$token" ]; then
+      # extraheader keeps the token out of the remote URL and git logs.
+      clone_git+=( -c "http.extraheader=AUTHORIZATION: bearer $token" )
     fi
-    [ "$xtrace_was_on" -eq 1 ] && set -x
-    return $st
   fi
-  git clone --depth 1 --branch "$ref" "https://github.com/${repo}.git" "$dest"
-  local st=$?
-  if [ $st -ne 0 ]; then
-    git clone --depth 1 "https://github.com/${repo}.git" "$dest" \
-      && git -C "$dest" fetch --depth 1 origin "$ref" \
-      && git -C "$dest" checkout FETCH_HEAD
-    st=$?
+
+  "${clone_git[@]}" clone --depth 1 --branch "$ref" "https://github.com/${repo}.git" "$dest" || st=$?
+  if [ "$st" -ne 0 ]; then
+    # Some SHAs cannot be used with --branch; fetch the commit instead.
+    st=0
+    "${clone_git[@]}" clone --depth 1 "https://github.com/${repo}.git" "$dest" \
+      && "${clone_git[@]}" -C "$dest" fetch --depth 1 origin "$ref" \
+      && git -C "$dest" checkout FETCH_HEAD || st=$?
   fi
   [ "$xtrace_was_on" -eq 1 ] && set -x
-  return $st
+  return "$st"
 }
 
 ckb_clients_download_actions_artifact() {
